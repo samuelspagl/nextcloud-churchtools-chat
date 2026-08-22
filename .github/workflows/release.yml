@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: [Main verification]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Read release version
+        id: version
+        run: |
+          VERSION="$(node -e "const fs=require('fs'); const xml=fs.readFileSync('appinfo/info.xml','utf8'); const match=xml.match(/<version>\\s*([^<\\s]+)\\s*<\\/version>/); if (!match) process.exit(1); process.stdout.write(match[1])")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Skip an existing release tag
+        id: existing
+        run: |
+          if git rev-parse --verify --quiet "refs/tags/${{ steps.version.outputs.tag }}"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Validate release version
+        if: steps.existing.outputs.exists == 'false'
+        run: node scripts/check-version.mjs
+      - name: Enable Corepack
+        if: steps.existing.outputs.exists == 'false'
+        run: corepack enable
+      - name: Install frontend dependencies
+        if: steps.existing.outputs.exists == 'false'
+        run: pnpm install --frozen-lockfile
+      - name: Build production assets
+        if: steps.existing.outputs.exists == 'false'
+        run: pnpm build
+      - name: Package Nextcloud app
+        if: steps.existing.outputs.exists == 'false'
+        run: |
+          STAGING_DIR="$(mktemp -d)"
+          rsync --archive --exclude-from=.nextcloudignore ./ "$STAGING_DIR/churchtools_chat/"
+          (cd "$STAGING_DIR" && zip -qr "$GITHUB_WORKSPACE/churchtools_chat-${{ steps.version.outputs.version }}.zip" churchtools_chat)
+      - name: Verify release archive
+        if: steps.existing.outputs.exists == 'false'
+        run: |
+          unzip -Z1 "churchtools_chat-${{ steps.version.outputs.version }}.zip" | grep -qx 'churchtools_chat/appinfo/info.xml'
+          unzip -p "churchtools_chat-${{ steps.version.outputs.version }}.zip" churchtools_chat/appinfo/info.xml | grep -q "<version>${{ steps.version.outputs.version }}</version>"
+      - name: Create GitHub release
+        if: steps.existing.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+          gh release create "${{ steps.version.outputs.tag }}" "churchtools_chat-${{ steps.version.outputs.version }}.zip" --generate-notes --title "${{ steps.version.outputs.tag }}"

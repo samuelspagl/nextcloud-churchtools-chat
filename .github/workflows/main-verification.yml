@@ -1,0 +1,59 @@
+name: Main verification
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Version gate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate release version
+        run: node scripts/check-version.mjs --base-ref HEAD^
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Type check
+        run: pnpm typecheck
+      - name: Run unit tests
+        run: pnpm test
+      - name: Build production assets
+        run: pnpm build
+
+  php:
+    name: PHP
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          coverage: none
+      - uses: ramsey/composer-install@v3
+        with:
+          composer-options: --prefer-dist --no-progress
+      - name: Lint PHP
+        run: composer lint
+      - name: Run unit tests
+        run: composer test

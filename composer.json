@@ -1,0 +1,28 @@
+{
+  "name": "efg-darmstadt/churchtools-chat",
+  "description": "ChurchTools Chat integration for Nextcloud",
+  "type": "project",
+  "license": "AGPL-3.0-or-later",
+  "require": {
+    "php": ">=8.1"
+  },
+  "require-dev": {
+    "nextcloud/ocp": "dev-stable34",
+    "phpunit/phpunit": "^10.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "OCA\\ChurchToolsChat\\": "lib/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "OCA\\ChurchToolsChat\\Tests\\": "tests/php/",
+      "OCP\\": "vendor/nextcloud/ocp/OCP/"
+    }
+  },
+  "scripts": {
+    "lint": "find appinfo lib templates tests -name '*.php' -print0 | xargs -0 -n1 php -l",
+    "test": "phpunit"
+  }
+}

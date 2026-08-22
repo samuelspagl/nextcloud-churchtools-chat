@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+    <id>churchtools_chat</id>
+    <name>ChurchTools Chat</name>
+    <summary>ChurchTools chat inside Nextcloud</summary>
+    <description><![CDATA[A chat-only Nextcloud app for ChurchTools Chat with person search, direct conversations, a native Vue interface, Markdown rendering and Smart Picker support.]]></description>
+    <version>0.3.17</version>
+    <licence>agpl</licence>
+    <author>EFG Darmstadt</author>
+    <namespace>ChurchToolsChat</namespace>
+    <category>social</category>
+    <dependencies>
+        <php min-version="8.1"/>
+        <nextcloud min-version="31" max-version="34"/>
+    </dependencies>
+    <navigations>
+        <navigation>
+            <name>ChurchTools Chat</name>
+            <route>churchtools_chat.page.index</route>
+            <icon>app.svg</icon>
+            <order>6</order>
+        </navigation>
+    </navigations>
+    <settings>
+        <personal>OCA\ChurchToolsChat\Settings\Personal</personal>
+    </settings>
+</info>

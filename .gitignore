@@ -1,0 +1,9 @@
+.env
+!.env.example
+.DS_Store
+node_modules/
+.pnpm-store/
+vendor/
+coverage/
+dist/
+.phpunit.result.cache
