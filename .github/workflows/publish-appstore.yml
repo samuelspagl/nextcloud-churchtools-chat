@@ -3,6 +3,10 @@ name: Publish to Nextcloud App Store
 on:
   release:
     types: [published]
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       tag:
@@ -20,7 +24,11 @@ permissions:
 
 jobs:
   publish:
-    if: vars.APPSTORE_ENABLED == 'true'
+    if: >-
+      vars.APPSTORE_ENABLED == 'true' &&
+      (github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'))
     environment: release
     runs-on: ubuntu-24.04
     steps:
@@ -29,14 +37,40 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == 'release' ]]; then
             echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+            echo "ref=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
             echo "nightly=${{ github.event.release.prerelease }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == 'workflow_run' ]]; then
+            echo "ref=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
           else
             echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+            echo "ref=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
             echo "nightly=${{ inputs.nightly }}" >> "$GITHUB_OUTPUT"
           fi
       - uses: actions/checkout@v4
         with:
-          ref: ${{ steps.release.outputs.tag }}
+          ref: ${{ steps.release.outputs.ref }}
+          fetch-depth: 0
+      - name: Derive and verify release tag
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(node -e "const fs=require('fs'); const xml=fs.readFileSync('appinfo/info.xml','utf8'); const match=xml.match(/<version>\\s*([^<\\s]+)\\s*<\\/version>/); if (!match) process.exit(1); process.stdout.write(match[1])")"
+          TAG="v$VERSION"
+          if [[ -n '${{ steps.release.outputs.tag }}' && '${{ steps.release.outputs.tag }}' != "$TAG" ]]; then
+            echo 'Selected tag does not match appinfo/info.xml.' >&2
+            exit 1
+          fi
+          git fetch --tags --force
+          test "$(git rev-parse "$TAG^{}")" = "$GITHUB_SHA"
+          gh release view "$TAG" >/dev/null
+          if [[ '${{ github.event_name }}' == 'workflow_run' ]]; then
+            NIGHTLY="$(gh release view "$TAG" --json isPrerelease --jq .isPrerelease)"
+          else
+            NIGHTLY='${{ steps.release.outputs.nightly }}'
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "nightly=$NIGHTLY" >> "$GITHUB_OUTPUT"
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -61,7 +95,7 @@ jobs:
       - name: Create App Store archive
         id: archive
         run: |
-          ARCHIVE="$GITHUB_WORKSPACE/churchtools_chat-${{ steps.release.outputs.tag }}.tar.gz"
+          ARCHIVE="$GITHUB_WORKSPACE/churchtools_chat-${{ steps.target.outputs.tag }}.tar.gz"
           scripts/package-appstore.sh "$ARCHIVE"
           echo "path=$ARCHIVE" >> "$GITHUB_OUTPUT"
           echo "name=$(basename "$ARCHIVE")" >> "$GITHUB_OUTPUT"
@@ -72,7 +106,7 @@ jobs:
           repo_token: ${{ github.token }}
           file: ${{ steps.archive.outputs.path }}
           asset_name: ${{ steps.archive.outputs.name }}
-          tag: ${{ steps.release.outputs.tag }}
+          tag: ${{ steps.target.outputs.tag }}
           overwrite: true
       - name: Publish to Nextcloud App Store
         uses: R0Wi/nextcloud-appstore-push-action@a011fe619bcf6e77ddebc96f9908e1af4071b9c1
@@ -81,4 +115,4 @@ jobs:
           appstore_token: ${{ secrets.APPSTORE_TOKEN }}
           download_url: ${{ steps.upload.outputs.browser_download_url }}
           app_private_key: ${{ secrets.APP_PRIVATE_KEY }}
-          nightly: ${{ steps.release.outputs.nightly }}
+          nightly: ${{ steps.target.outputs.nightly }}
