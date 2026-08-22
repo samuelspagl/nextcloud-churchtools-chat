@@ -1,0 +1,84 @@
+name: Publish to Nextcloud App Store
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing Git tag to publish
+        required: true
+        type: string
+      nightly:
+        description: Publish as a nightly release
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: vars.APPSTORE_ENABLED == 'true'
+    environment: release
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Select release
+        id: release
+        run: |
+          if [[ "${{ github.event_name }}" == 'release' ]]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+            echo "nightly=${{ github.event.release.prerelease }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+            echo "nightly=${{ inputs.nightly }}" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build production assets
+        run: pnpm build
+      - name: Validate signing credentials
+        env:
+          APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+          APP_PUBLIC_CRT: ${{ secrets.APP_PUBLIC_CRT }}
+        run: |
+          CERT_DIR="$RUNNER_TEMP/nextcloud-certificates"
+          mkdir -p "$CERT_DIR"
+          printf '%s' "$APP_PRIVATE_KEY" > "$CERT_DIR/churchtools_chat.key"
+          printf '%s' "$APP_PUBLIC_CRT" > "$CERT_DIR/churchtools_chat.crt"
+          chmod 600 "$CERT_DIR/churchtools_chat.key"
+          openssl rsa -in "$CERT_DIR/churchtools_chat.key" -check -noout
+          openssl x509 -in "$CERT_DIR/churchtools_chat.crt" -noout -subject | grep -q 'CN = churchtools_chat'
+      - name: Create App Store archive
+        id: archive
+        run: |
+          ARCHIVE="$GITHUB_WORKSPACE/churchtools_chat-${{ steps.release.outputs.tag }}.tar.gz"
+          scripts/package-appstore.sh "$ARCHIVE"
+          echo "path=$ARCHIVE" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "$ARCHIVE")" >> "$GITHUB_OUTPUT"
+      - name: Attach archive to GitHub release
+        id: upload
+        uses: svenstaro/upload-release-action@483c1e56f95e88835747b1c7c60581215016cbf2
+        with:
+          repo_token: ${{ github.token }}
+          file: ${{ steps.archive.outputs.path }}
+          asset_name: ${{ steps.archive.outputs.name }}
+          tag: ${{ steps.release.outputs.tag }}
+          overwrite: true
+      - name: Publish to Nextcloud App Store
+        uses: R0Wi/nextcloud-appstore-push-action@a011fe619bcf6e77ddebc96f9908e1af4071b9c1
+        with:
+          app_name: churchtools_chat
+          appstore_token: ${{ secrets.APPSTORE_TOKEN }}
+          download_url: ${{ steps.upload.outputs.browser_download_url }}
+          app_private_key: ${{ secrets.APP_PRIVATE_KEY }}
+          nightly: ${{ steps.release.outputs.nightly }}

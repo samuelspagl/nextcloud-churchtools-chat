@@ -51,6 +51,17 @@ status checks before merging. Allow GitHub Actions to create and approve pull
 requests only if that matches the repository's governance policy; no additional
 release secret is required for the built-in `GITHUB_TOKEN`.
 
+## Nextcloud App Store
+
+After the Nextcloud certificate request for `churchtools_chat` is approved and
+the app is registered in the App Store, create the protected GitHub environment
+`release`. Add `APP_PRIVATE_KEY`, `APP_PUBLIC_CRT`, and `APPSTORE_TOKEN` as
+environment secrets, then set the repository variable `APPSTORE_ENABLED` to
+`true`. Publishing a GitHub Release will build and attach a
+`churchtools_chat-<tag>.tar.gz` archive and submit it to the App Store after
+environment approval. Use **Publish to Nextcloud App Store** with a tag to
+publish an existing release manually.
+
 ## Local Docker test stack
 
 The included Compose stack runs Nextcloud 34 with PostgreSQL and Redis, mounts

@@ -5,11 +5,19 @@
     <name>ChurchTools Chat</name>
     <summary>ChurchTools chat inside Nextcloud</summary>
     <description><![CDATA[A chat-only Nextcloud app for ChurchTools Chat with person search, direct conversations, a native Vue interface, Markdown rendering and Smart Picker support.]]></description>
-    <version>0.3.18</version>
-    <licence>agpl</licence>
+    <version>0.3.19</version>
+    <licence>AGPL-3.0-or-later</licence>
     <author>EFG Darmstadt</author>
     <namespace>ChurchToolsChat</namespace>
     <category>social</category>
+    <website>https://github.com/samuelspagl/nextcloud-churchtools-chat</website>
+    <bugs>https://github.com/samuelspagl/nextcloud-churchtools-chat/issues</bugs>
+    <repository type="git">https://github.com/samuelspagl/nextcloud-churchtools-chat.git</repository>
+    <documentation>
+        <user>https://github.com/samuelspagl/nextcloud-churchtools-chat#readme</user>
+        <admin>https://github.com/samuelspagl/nextcloud-churchtools-chat#readme</admin>
+        <developer>https://github.com/samuelspagl/nextcloud-churchtools-chat#readme</developer>
+    </documentation>
     <dependencies>
         <php min-version="8.1"/>
         <nextcloud min-version="31" max-version="34"/>
