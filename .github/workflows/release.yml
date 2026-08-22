@@ -20,6 +20,7 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -41,9 +42,6 @@ jobs:
       - name: Validate release version
         if: steps.existing.outputs.exists == 'false'
         run: node scripts/check-version.mjs
-      - name: Enable Corepack
-        if: steps.existing.outputs.exists == 'false'
-        run: corepack enable
       - name: Install frontend dependencies
         if: steps.existing.outputs.exists == 'false'
         run: pnpm install --frozen-lockfile
