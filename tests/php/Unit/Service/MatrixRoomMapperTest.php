@@ -112,6 +112,29 @@ final class MatrixRoomMapperTest extends TestCase {
 		self::assertSame('anna schmidt', $members[0]['displayName']);
 	}
 
+	public function testSurfacesLimitedTimelineAndPrevBatch(): void {
+		$members = $this->mapper->members([$this->member('@ct_anna:chat.church.tools', 'Anna Schmidt')]);
+		$room = $this->mapper->room(
+			'!limited:chat.church.tools',
+			[
+				'state' => ['events' => []],
+				'timeline' => [
+					'events' => [],
+					'limited' => true,
+					'prev_batch' => '$prev:chat.church.tools',
+				],
+				'summary' => ['m.joined_member_count' => 2],
+				'unread_notifications' => [],
+			],
+			[],
+			'@ct_me:chat.church.tools',
+			$members,
+		);
+
+		self::assertTrue($room['limited']);
+		self::assertSame('$prev:chat.church.tools', $room['prevBatch']);
+	}
+
 	public function testMessagesContainResolvedSenderMetadata(): void {
 		$members = $this->mapper->members([
 			$this->member('@ct_anna:chat.church.tools', 'Anna Schmidt', 'mxc://chat.church.tools/anna'),

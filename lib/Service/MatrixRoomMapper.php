@@ -81,6 +81,10 @@ final class MatrixRoomMapper {
 		$lastMessage = $messages === [] ? null : $messages[array_key_last($messages)];
 		$joinedCount = count(array_filter($members, static fn (array $member): bool => $member['membership'] === 'join'));
 
+		$timeline = is_array($room['timeline'] ?? null) ? $room['timeline'] : [];
+		$limited = ($timeline['limited'] ?? false) === true;
+		$prevBatch = isset($timeline['prev_batch']) ? (string)$timeline['prev_batch'] : null;
+
 		return [
 			'id' => $roomId,
 			'name' => $name,
@@ -89,6 +93,8 @@ final class MatrixRoomMapper {
 			'kind' => $kind,
 			'memberCount' => (int)($room['summary']['m.joined_member_count'] ?? $joinedCount),
 			'unreadCount' => (int)($room['unread_notifications']['notification_count'] ?? 0),
+			'limited' => $limited,
+			'prevBatch' => $prevBatch,
 			'lastMessage' => $lastMessage,
 			'events' => $messages,
 		];

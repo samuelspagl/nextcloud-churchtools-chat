@@ -13,7 +13,7 @@ vi.mock('@nextcloud/router', () => ({
 	generateUrl: (path: string) => path,
 }))
 
-import { getRoomDetails, searchConversations, searchPersons, searchRoomMessages, startDirectChat } from '../../src/services/chatApi'
+import { getErrorCode, getErrorMessage, getErrorValue, getRoomDetails, searchConversations, searchPersons, searchRoomMessages, startDirectChat } from '../../src/services/chatApi'
 
 const mockedAxios = vi.mocked(axios)
 
@@ -84,5 +84,33 @@ describe('direct chat API', () => {
 			'/apps/churchtools_chat/api/search',
 			{ params: { query: 'meeting notes' } },
 		)
+	})
+})
+
+describe('error envelope helpers', () => {
+	it('reads the code, message and value from the response envelope', () => {
+		const error = {
+			response: {
+				data: {
+					error: {
+						code: 'matrix_rate_limited',
+						message: 'rate limited',
+						value: 12,
+					},
+				},
+			},
+		}
+
+		expect(getErrorCode(error)).toBe('matrix_rate_limited')
+		expect(getErrorMessage(error)).toBe('rate limited')
+		expect(getErrorValue(error)).toBe(12)
+	})
+
+	it('returns null or a fallback when no envelope is present', () => {
+		const plain = new Error('boom')
+
+		expect(getErrorCode(plain)).toBeNull()
+		expect(getErrorValue(plain)).toBeNull()
+		expect(getErrorMessage(plain)).toBe('The request could not be completed.')
 	})
 })

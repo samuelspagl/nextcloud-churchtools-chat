@@ -53,6 +53,8 @@ export interface ChatRoom {
 	kind: 'direct' | 'group'
 	memberCount: number
 	unreadCount: number
+	limited?: boolean
+	prevBatch?: string | null
 	lastMessage: ChatMessage | null
 	events: ChatMessage[]
 }

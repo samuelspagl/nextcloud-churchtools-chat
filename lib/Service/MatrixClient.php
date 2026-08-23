@@ -431,6 +431,14 @@ final class MatrixClient {
 				}
 				throw new IntegrationException('matrix_session_expired', 'The Matrix session is unavailable or expired.', 401);
 			}
+			if ($status === 429) {
+				$retryAfter = null;
+				$retryAfterHeader = $response->getHeader('Retry-After');
+				if ($retryAfterHeader !== '' && is_numeric($retryAfterHeader)) {
+					$retryAfter = (int)$retryAfterHeader;
+				}
+				throw new IntegrationException('matrix_rate_limited', 'Matrix rate limited the request.', 429, $retryAfter);
+			}
 			if ($status < 200 || $status >= 300) {
 				throw new IntegrationException('matrix_request_failed', 'Matrix could not complete the request.', 502);
 			}

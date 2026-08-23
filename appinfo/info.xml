@@ -5,7 +5,7 @@
     <name>ChurchTools Chat</name>
     <summary>ChurchTools chat inside Nextcloud</summary>
     <description><![CDATA[A chat-only Nextcloud app for ChurchTools Chat with person search, direct conversations, a native Vue interface, Markdown rendering and Smart Picker support.]]></description>
-    <version>0.4.0</version>
+    <version>0.4.1</version>
     <licence>AGPL-3.0-or-later</licence>
     <author>Samuel Spagl</author>
     <namespace>ChurchToolsChat</namespace>

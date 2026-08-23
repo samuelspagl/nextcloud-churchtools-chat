@@ -260,6 +260,37 @@ final class MatrixClientTest extends TestCase {
 		yield 'upstream failure' => [500, 'matrix_media_failed', 502];
 	}
 
+	public function testMapsRateLimitWithRetryAfter(): void {
+		$this->response->method('getStatusCode')->willReturn(429);
+		$this->response->method('getHeader')->willReturnCallback(static fn (string $name): string => $name === 'Retry-After' ? '42' : '');
+		$this->response->method('getBody')->willReturn('{}');
+		$this->httpClient->method('get')->willReturn($this->response);
+
+		try {
+			$this->matrix->sync('token', null);
+			self::fail('Expected an IntegrationException.');
+		} catch (IntegrationException $exception) {
+			self::assertSame('matrix_rate_limited', $exception->getErrorCode());
+			self::assertSame(429, $exception->getHttpStatus());
+			self::assertSame(42, $exception->getValue());
+		}
+	}
+
+	public function testMapsRateLimitWithoutRetryAfterHeader(): void {
+		$this->response->method('getStatusCode')->willReturn(429);
+		$this->response->method('getHeader')->willReturn('');
+		$this->response->method('getBody')->willReturn('{}');
+		$this->httpClient->method('get')->willReturn($this->response);
+
+		try {
+			$this->matrix->sync('token', null);
+			self::fail('Expected an IntegrationException.');
+		} catch (IntegrationException $exception) {
+			self::assertSame('matrix_rate_limited', $exception->getErrorCode());
+			self::assertNull($exception->getValue());
+		}
+	}
+
 	private function configureResponse(int $status, string $contentType, string $body): void {
 		$this->response->method('getStatusCode')->willReturn($status);
 		$this->response->method('getHeader')->willReturnCallback(static fn (string $name): string => $name === 'Content-Type' ? $contentType : '');
