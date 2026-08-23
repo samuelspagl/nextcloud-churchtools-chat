@@ -397,6 +397,21 @@ final class MatrixClient {
 	}
 
 	/** @return array<string,mixed> */
+	public function editMessage(string $accessToken, string $roomId, string $eventId, string $body, string $transactionId): array {
+		return $this->request(
+			'PUT',
+			'/_matrix/client/v3/rooms/' . rawurlencode($roomId) . '/send/m.room.message/' . rawurlencode($transactionId),
+			$accessToken,
+			[
+				'msgtype' => 'm.text',
+				'body' => $body,
+				'new_content' => ['msgtype' => 'm.text', 'body' => $body],
+				'm.relates_to' => ['rel_type' => 'm.replace', 'event_id' => $eventId],
+			],
+		);
+	}
+
+	/** @return array<string,mixed> */
 	private function request(string $method, string $path, ?string $accessToken = null, ?array $body = null, bool $mapAuthFailure = true): array {
 		$options = [
 			'headers' => ['Accept' => 'application/json', 'Content-Type' => 'application/json'],

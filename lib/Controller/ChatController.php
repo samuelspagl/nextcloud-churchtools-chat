@@ -73,6 +73,11 @@ final class ChatController extends ApiController {
 	}
 
 	/** @NoAdminRequired */
+	public function edit(string $roomId, string $eventId, string $body, ?string $transactionId = null): JSONResponse {
+		return $this->respond(fn (): array => $this->gateway->edit($this->userContext->getUserId(), $roomId, $eventId, $body, $transactionId), 201);
+	}
+
+	/** @NoAdminRequired */
 	public function sync(?string $since = null): JSONResponse {
 		return $this->respond(fn (): array => $this->gateway->sync($this->userContext->getUserId(), $since));
 	}

@@ -291,6 +291,31 @@ final class MatrixClientTest extends TestCase {
 		}
 	}
 
+	public function testSendsEditWithReplaceRelation(): void {
+		$this->response->method('getStatusCode')->willReturn(200);
+		$this->response->method('getBody')->willReturn(json_encode(['event_id' => '$edited:chat.church.tools']));
+		$this->httpClient
+			->expects(self::once())
+			->method('put')
+			->with(
+				self::callback(static fn (string $url): bool => str_contains($url, '/send/m.room.message/nc-txn')),
+				self::callback(static function (array $options): bool {
+					$body = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
+					self::assertSame('Bearer secret-token', $options['headers']['Authorization']);
+					self::assertSame('new body', $body['body']);
+					self::assertSame('new body', $body['new_content']['body']);
+					self::assertSame('m.replace', $body['m.relates_to']['rel_type']);
+					self::assertSame('$target:chat.church.tools', $body['m.relates_to']['event_id']);
+					return true;
+				}),
+			)
+			->willReturn($this->response);
+
+		$result = $this->matrix->editMessage('secret-token', '!room:chat.church.tools', '$target:chat.church.tools', 'new body', 'nc-txn');
+
+		self::assertSame('$edited:chat.church.tools', $result['event_id']);
+	}
+
 	private function configureResponse(int $status, string $contentType, string $body): void {
 		$this->response->method('getStatusCode')->willReturn($status);
 		$this->response->method('getHeader')->willReturnCallback(static fn (string $name): string => $name === 'Content-Type' ? $contentType : '');

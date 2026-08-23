@@ -18,6 +18,7 @@ import {
 import type { ChatMessage, ChatRoom, ChatStatus, ConversationSearchResult, PersonSearchResult, RoomDetails } from '../types/chat'
 import { mergeRooms } from '../utils/rooms'
 import { backoffDelay } from '../utils/backoff'
+import { buildReplyRelation } from '../utils/relations'
 
 function transactionId(): string {
 	return `nc-${crypto.randomUUID()}`
@@ -103,10 +104,11 @@ export function useChat() {
 		}
 	}
 
-	async function send(body: string, replyTo?: ChatMessage) {
+	async function send(body: string, options?: { replyTo?: ChatMessage; transactionId?: string }) {
 		const roomId = activeRoomId.value
+		const replyTo = options?.replyTo
 		if (!roomId || body.trim() === '') return
-		const txn = transactionId()
+		const txn = options?.transactionId ?? transactionId()
 		const optimistic: ChatMessage = {
 			id: txn,
 			sender: status.value?.matrixUserId ?? '',
@@ -115,7 +117,7 @@ export function useChat() {
 			timestamp: Date.now(),
 			status: 'sending',
 			transactionId: txn,
-			relatesTo: replyTo ? { 'm.in_reply_to': { event_id: replyTo.id } } : null,
+			relatesTo: replyTo ? buildReplyRelation(replyTo.id) : null,
 		}
 		rooms.value = rooms.value.map((room) => room.id === roomId
 			? { ...room, events: [...room.events, optimistic], lastMessage: optimistic }
@@ -154,7 +156,7 @@ export function useChat() {
 		rooms.value = rooms.value.map((room) => room.id === roomId
 			? { ...room, events: room.events.filter((item) => item.id !== message.id) }
 			: room)
-		await send(message.body)
+		await send(message.body, { transactionId: message.transactionId })
 	}
 
 	async function searchPersons(query: string) {
