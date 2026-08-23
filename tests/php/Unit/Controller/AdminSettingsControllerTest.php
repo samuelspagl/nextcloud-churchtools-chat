@@ -49,16 +49,16 @@ final class AdminSettingsControllerTest extends TestCase {
 	}
 
 	public function testSavePersistsConfiguration(): void {
-		$response = $this->controller->save('https://efg-darmstadt.church.tools', 'https://matrix.example.org');
+		$response = $this->controller->save('https://example.church.tools', 'https://matrix.example.org');
 
 		self::assertSame([
-			'churchToolsTenantUrl' => 'https://efg-darmstadt.church.tools',
+			'churchToolsTenantUrl' => 'https://example.church.tools',
 			'matrixServerUrl' => 'https://matrix.example.org',
 		], $response->getData()['data']);
 	}
 
 	public function testSaveRejectsInvalidMatrixServerUrl(): void {
-		$response = $this->controller->save('https://efg-darmstadt.church.tools', 'ftp://example.org');
+		$response = $this->controller->save('https://example.church.tools', 'ftp://example.org');
 
 		self::assertArrayHasKey('error', $response->getData());
 		self::assertSame('invalid_matrix_server_url', $response->getData()['error']['code']);

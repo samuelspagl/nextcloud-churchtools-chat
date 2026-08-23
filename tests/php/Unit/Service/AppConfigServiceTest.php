@@ -44,14 +44,14 @@ final class AppConfigServiceTest extends TestCase {
 	}
 
 	public function testSaveNormalizesTenantUrl(): void {
-		$this->appConfig->save('https://EFG-Darmstadt.church.tools/', 'https://chat.church.tools/');
+		$this->appConfig->save('https://example.church.tools/', 'https://chat.church.tools/');
 
-		self::assertSame('https://efg-darmstadt.church.tools', $this->appConfig->getTenantUrl());
+		self::assertSame('https://example.church.tools', $this->appConfig->getTenantUrl());
 		self::assertSame('https://chat.church.tools', $this->appConfig->getMatrixServerUrl());
 	}
 
 	public function testSaveStripsMatrixPathAndDefaultsWhenEmpty(): void {
-		$this->appConfig->save('https://efg-darmstadt.church.tools', '');
+		$this->appConfig->save('https://example.church.tools', '');
 
 		self::assertSame('https://chat.church.tools', $this->appConfig->getMatrixServerUrl());
 	}
@@ -71,14 +71,14 @@ final class AppConfigServiceTest extends TestCase {
 	public function testSaveRejectsInvalidMatrixServerUrl(): void {
 		$this->expectException(IntegrationException::class);
 
-		$this->appConfig->save('https://efg-darmstadt.church.tools', 'http://example.org/path');
+		$this->appConfig->save('https://example.church.tools', 'http://example.org/path');
 	}
 
 	public function testStateReflectsSavedValues(): void {
-		$this->appConfig->save('https://efg-darmstadt.church.tools', 'https://matrix.example.org');
+		$this->appConfig->save('https://example.church.tools', 'https://matrix.example.org');
 
 		self::assertSame([
-			'churchToolsTenantUrl' => 'https://efg-darmstadt.church.tools',
+			'churchToolsTenantUrl' => 'https://example.church.tools',
 			'matrixServerUrl' => 'https://matrix.example.org',
 		], $this->appConfig->getState());
 	}
