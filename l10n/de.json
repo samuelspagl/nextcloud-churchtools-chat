@@ -41,7 +41,7 @@
 		"ChurchTools access token": "ChurchTools-Zugriffstoken",
 		"ChurchTools tenant URL": "ChurchTools-Instanz-URL",
 		"Configure the servers used by ChurchTools Chat. These settings apply to all users; each user still connects with their own access token and CT Chat password.": "Konfiguriere die von ChurchTools Chat verwendeten Server. Diese Einstellungen gelten für alle Benutzer; jeder Benutzer verbindet sich weiterhin mit seinem eigenen Zugriffstoken und CT-Chat-Passwort.",
-		"HTTPS URL of the ChurchTools tenant, e.g. https://efg-darmstadt.church.tools": "HTTPS-URL der ChurchTools-Instanz, z. B. https://efg-darmstadt.church.tools",
+		"HTTPS URL of the ChurchTools tenant, e.g. https://ihre-gemeinde.church.tools": "HTTPS-URL der ChurchTools-Instanz, z. B. https://ihre-gemeinde.church.tools",
 		"Matrix homeserver URL": "Matrix-Homeserver-URL",
 		"HTTPS URL of the Matrix homeserver, e.g. https://chat.church.tools": "HTTPS-URL des Matrix-Homeservers, z. B. https://chat.church.tools",
 		"Save": "Speichern",

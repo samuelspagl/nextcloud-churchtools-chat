@@ -51,7 +51,7 @@ async function save() {
 				v-model="churchToolsTenantUrl"
 				:label="t('churchtools_chat', 'ChurchTools tenant URL')"
 				autocomplete="url"
-				:helper-text="t('churchtools_chat', 'HTTPS URL of the ChurchTools tenant, e.g. https://efg-darmstadt.church.tools')" />
+				:helper-text="t('churchtools_chat', 'HTTPS URL of the ChurchTools tenant, e.g. https://ihre-gemeinde.church.tools')" />
 			<NcTextField
 				v-model="matrixServerUrl"
 				:label="t('churchtools_chat', 'Matrix homeserver URL')"
