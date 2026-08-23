@@ -52,6 +52,7 @@ async function saveToNextcloud() {
 			.setMultiSelect(false)
 			.allowDirectories(true)
 			.setCanPick((node) => node.type === 'folder')
+			.setType(1)
 			.build()
 		const path = await picker.pick()
 		if (typeof path !== 'string') return
