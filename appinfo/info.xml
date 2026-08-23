@@ -31,7 +31,9 @@
         </navigation>
     </navigations>
     <settings>
+        <personal-section>OCA\ChurchToolsChat\Settings\PersonalSection</personal-section>
         <personal>OCA\ChurchToolsChat\Settings\Personal</personal>
+        <admin-section>OCA\ChurchToolsChat\Settings\AdminSection</admin-section>
         <admin>OCA\ChurchToolsChat\Settings\Admin</admin>
     </settings>
 </info>
