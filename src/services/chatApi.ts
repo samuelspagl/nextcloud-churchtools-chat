@@ -85,6 +85,14 @@ export async function reactToMessage(roomId: string, eventId: string, emoji: str
 	)
 }
 
+export async function editMessage(roomId: string, eventId: string, body: string, transactionId: string): Promise<{ eventId: string; transactionId: string }> {
+	const response = await axios.put<ApiEnvelope<{ eventId: string; transactionId: string }>>(
+		endpoint(`/api/rooms/${encodeURIComponent(roomId)}/messages/${encodeURIComponent(eventId)}`),
+		{ body, transactionId },
+	)
+	return response.data.data
+}
+
 export async function saveAttachment(mxc: string, directory: string, filename: string): Promise<{ path: string }> {
 	const response = await axios.post<ApiEnvelope<{ path: string }>>(endpoint('/api/media/save'), { mxc, directory, filename })
 	return response.data.data

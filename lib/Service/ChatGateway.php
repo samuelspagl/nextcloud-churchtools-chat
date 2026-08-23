@@ -241,6 +241,21 @@ final class ChatGateway {
 		return ['eventId' => (string)($result['event_id'] ?? ''), 'transactionId' => $transactionId];
 	}
 
+	/** @return array{eventId:string,transactionId:string} */
+	public function edit(string $userId, string $roomId, string $eventId, string $body, ?string $transactionId): array {
+		$this->assertRoomId($roomId);
+		$this->assertEventId($eventId);
+		$body = trim($body);
+		if ($body === '' || mb_strlen($body) > 10000) {
+			throw new IntegrationException('invalid_message', 'Messages must contain between 1 and 10,000 characters.');
+		}
+		$transactionId = $transactionId !== null && preg_match('/^[A-Za-z0-9._-]{8,128}$/', $transactionId)
+			? $transactionId
+			: bin2hex(random_bytes(16));
+		$result = $this->matrix->editMessage($this->requireMatrixToken($userId), $roomId, $eventId, $body, $transactionId);
+		return ['eventId' => (string)($result['event_id'] ?? ''), 'transactionId' => $transactionId];
+	}
+
 	/** @return array{rooms:list<array<string,mixed>>,nextBatch:string|null} */
 	public function sync(string $userId, ?string $since): array {
 		$matrixToken = $this->requireMatrixToken($userId);

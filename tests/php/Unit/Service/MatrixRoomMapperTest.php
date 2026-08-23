@@ -135,6 +135,37 @@ final class MatrixRoomMapperTest extends TestCase {
 		self::assertSame('$prev:chat.church.tools', $room['prevBatch']);
 	}
 
+	public function testEditReplacesBodyAndMarksMessageAsEdited(): void {
+		$members = $this->mapper->members([$this->member('@ct_anna:chat.church.tools', 'Anna Schmidt')]);
+		$events = [
+			[
+				'type' => 'm.room.message',
+				'event_id' => '$original',
+				'sender' => '@ct_anna:chat.church.tools',
+				'origin_server_ts' => 100,
+				'content' => ['msgtype' => 'm.text', 'body' => 'original'],
+			],
+			[
+				'type' => 'm.room.message',
+				'event_id' => '$edit',
+				'sender' => '@ct_anna:chat.church.tools',
+				'origin_server_ts' => 200,
+				'content' => [
+					'msgtype' => 'm.text',
+					'body' => '* new body',
+					'm.new_content' => ['msgtype' => 'm.text', 'body' => 'new body'],
+					'm.relates_to' => ['rel_type' => 'm.replace', 'event_id' => '$original'],
+				],
+			],
+		];
+
+		$messages = $this->mapper->events($events, $members);
+
+		self::assertCount(1, $messages);
+		self::assertSame('new body', $messages[0]['body']);
+		self::assertTrue($messages[0]['edited']);
+	}
+
 	public function testMessagesContainResolvedSenderMetadata(): void {
 		$members = $this->mapper->members([
 			$this->member('@ct_anna:chat.church.tools', 'Anna Schmidt', 'mxc://chat.church.tools/anna'),

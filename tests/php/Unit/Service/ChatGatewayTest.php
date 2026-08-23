@@ -107,6 +107,20 @@ final class ChatGatewayTest extends TestCase {
 				return $matrixResponse;
 			},
 		);
+		$editResponse = $this->createMock(IResponse::class);
+		$editResponse->method('getStatusCode')->willReturn(200);
+		$editResponse->method('getBody')->willReturn(json_encode(['event_id' => '$edited:chat.church.tools', 'origin_server_ts' => 1]));
+		$httpClient->method('put')->willReturnCallback(
+			static function (string $url, array $options) use ($editResponse): IResponse {
+				self::assertStringContainsString('/send/m.room.message/', $url);
+				self::assertSame('Bearer matrix-token', $options['headers']['Authorization']);
+				$body = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
+				self::assertSame('m.replace', $body['m.relates_to']['rel_type']);
+				self::assertSame('$target:chat.church.tools', $body['m.relates_to']['event_id']);
+				self::assertSame('new body', $body['body']);
+				return $editResponse;
+			},
+		);
 		$clientService = $this->createMock(IClientService::class);
 		$clientService->method('newClient')->willReturn($httpClient);
 		$appConfig = $this->createMock(\OCP\IConfig::class);
@@ -124,5 +138,13 @@ final class ChatGatewayTest extends TestCase {
 			new MatrixRoomMapper(),
 			$appConfigService,
 		);
+	}
+
+	public function testEditDelegatesReplaceRelationToMatrix(): void {
+		$gateway = $this->createGateway(200, 'mxc://chat.church.tools/matrix-avatar');
+
+		$result = $gateway->edit('user', '!room:chat.church.tools', '$target:chat.church.tools', 'new body', null);
+
+		self::assertSame('$edited:chat.church.tools', $result['eventId']);
 	}
 }
