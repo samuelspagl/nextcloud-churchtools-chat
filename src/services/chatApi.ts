@@ -120,12 +120,30 @@ export async function saveAdminSettings(churchToolsTenantUrl: string, matrixServ
 }
 
 export function getErrorMessage(error: unknown): string {
-	if (typeof error === 'object' && error !== null && 'response' in error) {
-		const response = (error as { response?: { data?: { error?: { message?: string } } } }).response
-		const message = response?.data?.error?.message
-		if (message) {
-			return message
-		}
+	const message = readErrorField(error, 'message')
+	if (typeof message === 'string' && message !== '') {
+		return message
 	}
 	return 'The request could not be completed.'
+}
+
+function readErrorField(error: unknown, field: 'code' | 'message' | 'value'): string | number | undefined {
+	if (typeof error === 'object' && error !== null && 'response' in error) {
+		const response = (error as { response?: { data?: { error?: Record<string, unknown> } } }).response
+		const value = response?.data?.error?.[field]
+		if (typeof value === 'string' || typeof value === 'number') {
+			return value
+		}
+	}
+	return undefined
+}
+
+export function getErrorCode(error: unknown): string | null {
+	const code = readErrorField(error, 'code')
+	return typeof code === 'string' ? code : null
+}
+
+export function getErrorValue(error: unknown): number | null {
+	const value = readErrorField(error, 'value')
+	return typeof value === 'number' ? value : null
 }

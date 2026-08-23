@@ -1,6 +1,8 @@
 import { computed, onBeforeUnmount, onMounted, readonly, ref, shallowRef } from 'vue'
 import {
+	getErrorCode,
 	getErrorMessage,
+	getErrorValue,
 	getMessages,
 	getRoomDetails,
 	getRooms,
@@ -15,6 +17,7 @@ import {
 } from '../services/chatApi'
 import type { ChatMessage, ChatRoom, ChatStatus, ConversationSearchResult, PersonSearchResult, RoomDetails } from '../types/chat'
 import { mergeRooms } from '../utils/rooms'
+import { backoffDelay } from '../utils/backoff'
 
 function transactionId(): string {
 	return `nc-${crypto.randomUUID()}`
@@ -43,6 +46,7 @@ export function useChat() {
 	const messageSearchError = shallowRef('')
 	const focusedMessageId = shallowRef<string | null>(null)
 	const nextBatch = shallowRef<string | undefined>()
+	const sessionExpired = shallowRef(false)
 	let stopped = false
 	let personSearchSequence = 0
 	let conversationSearchSequence = 0
@@ -362,13 +366,41 @@ export function useChat() {
 	}
 
 	async function syncLoop() {
-		while (!stopped && status.value?.matrixConnected) {
+		let attempt = 0
+		while (!stopped && status.value?.matrixConnected && !sessionExpired.value) {
 			try {
 				const response = await syncRooms(nextBatch.value)
 				nextBatch.value = response.nextBatch ?? nextBatch.value
 				rooms.value = mergeRooms(rooms.value, response.rooms)
-			} catch {
-				await new Promise((resolve) => window.setTimeout(resolve, 5000))
+				attempt = 0
+				await reloadLimitedRooms(response.rooms)
+			} catch (caught) {
+				if (getErrorCode(caught) === 'matrix_session_expired') {
+					sessionExpired.value = true
+					if (status.value) {
+						status.value = { ...status.value, matrixConnected: false }
+					}
+					return
+				}
+				const retryAfter = getErrorValue(caught)
+				const delay = backoffDelay(attempt, retryAfter)
+				attempt += 1
+				await new Promise((resolve) => window.setTimeout(resolve, delay))
+			}
+		}
+	}
+
+	async function reloadLimitedRooms(incoming: ChatRoom[]) {
+		for (const room of incoming) {
+			if (!room.limited) continue
+			const roomId = room.id
+			try {
+				const response = await getMessages(roomId, room.prevBatch ?? undefined)
+				rooms.value = mergeRooms(rooms.value, [{ ...room, events: response.events, limited: false }])
+			} catch (caught) {
+				if (getErrorCode(caught) === 'matrix_session_expired') {
+					throw caught
+				}
 			}
 		}
 	}
@@ -383,6 +415,7 @@ export function useChat() {
 
 	return {
 		status: readonly(status),
+		sessionExpired: readonly(sessionExpired),
 		rooms,
 		activeRoomId: readonly(activeRoomId),
 		activeRoom,

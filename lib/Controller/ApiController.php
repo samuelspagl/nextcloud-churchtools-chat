@@ -26,9 +26,12 @@ abstract class ApiController extends Controller {
 			return new JSONResponse(['data' => $operation()], $successStatus);
 		} catch (IntegrationException $e) {
 			$this->logger->warning('ChurchTools Chat integration request failed', ['errorCode' => $e->getErrorCode()]);
-			return new JSONResponse([
-				'error' => ['code' => $e->getErrorCode(), 'message' => $e->getMessage()],
-			], $e->getHttpStatus());
+			$error = ['code' => $e->getErrorCode(), 'message' => $e->getMessage()];
+			$value = $e->getValue();
+			if ($value !== null) {
+				$error['value'] = $value;
+			}
+			return new JSONResponse(['error' => $error], $e->getHttpStatus());
 		} catch (Throwable $e) {
 			$this->logger->error('Unexpected ChurchTools Chat error', ['exceptionClass' => get_debug_type($e)]);
 			return new JSONResponse([

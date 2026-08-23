@@ -15,6 +15,7 @@ import type { ChatMessage, PersonSearchResult } from './types/chat'
 
 const {
 	status,
+	sessionExpired,
 	rooms,
 	activeRoomId,
 	activeRoom,
@@ -183,6 +184,10 @@ async function retryMessage(message: ChatMessage) {
 				@new-chat="openPersonSearch" />
 
 			<main class="chat-pane">
+				<div v-if="sessionExpired" class="session-expired" role="alert">
+					<span>{{ t('churchtools_chat', 'Your chat session expired. Reconnect in Personal settings to keep receiving messages.') }}</span>
+					<a :href="settingsUrl">{{ t('churchtools_chat', 'Open Personal settings') }}</a>
+				</div>
 				<ConversationHeader
 					v-if="activeRoom"
 					:room="activeRoom"
@@ -243,6 +248,8 @@ async function retryMessage(message: ChatMessage) {
 .chat-layout > :first-child { border-inline-end: 1px solid var(--color-border); }
 .chat-pane { display: grid; min-width: 0; min-height: 0; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--color-main-background); }
 .connection-state { max-width: 560px; margin: auto; padding: 24px; text-align: center; }
+.session-expired { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; padding: 10px 16px; background: var(--color-error); color: var(--color-primary-element-text); font-size: 0.9em; }
+.session-expired a { color: inherit; font-weight: 600; text-decoration: underline; }
 .connection-state h2 { margin-block: 0 8px; }
 @media (max-width: 639px) {
 	.chat-layout { display: block; }
