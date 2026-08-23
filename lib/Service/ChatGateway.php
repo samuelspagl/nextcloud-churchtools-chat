@@ -20,6 +20,7 @@ final class ChatGateway {
 	/** @return array<string,mixed> */
 	public function getStatus(string $userId): array {
 		$state = $this->secrets->getPublicState($userId);
+		$state['tenantUrl'] = $this->appConfig->getTenantUrl();
 		return [
 			...$state,
 			'capabilities' => [
