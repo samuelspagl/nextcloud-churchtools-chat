@@ -12,9 +12,10 @@ message transport or Matrix token-exchange endpoint. The app validates and
 stores each user's ChurchTools login token separately. To obtain a Matrix
 session, users enter only their CT Chat password. The Matrix user ID is derived
 from the GUID returned by `/api/whoami`: the GUID is normalized to lowercase
-and formatted as `@ct_<guid>:chat.church.tools`. The derived ID and password are
-sent once to `POST https://chat.church.tools/_matrix/client/v3/login`; the
-password is not persisted. Only the returned Matrix access token, user ID and
+and formatted as `@ct_<guid>:<matrix-server-name>`, where the Matrix server name
+is the host of the homeserver URL configured by the administrator. The derived ID
+and password are sent once to `POST <matrix-homeserver>/_matrix/client/v3/login`;
+the password is not persisted. Only the returned Matrix access token, user ID and
 device ID are kept. The app never treats the API token as a Matrix password.
 
 ## Starting a direct chat
@@ -35,7 +36,9 @@ pnpm build
 ```
 
 Install the folder as `churchtools_chat` inside the Nextcloud apps directory,
-enable it, and connect an account in **Personal settings → Additional settings**.
+enable it, configure the ChurchTools tenant and Matrix homeserver under
+**Administration settings → Additional settings**, and have each user connect
+their own account in **Personal settings → Additional settings**.
 
 ## Releases
 
@@ -85,8 +88,9 @@ docker compose up -d --wait
 ```
 
 Open <http://localhost:8080> and sign in with `admin` / `admin`, unless those
-development credentials were changed in `.env`. Then open **Personal settings
-→ Additional settings** and connect the ChurchTools account.
+development credentials were changed in `.env`. Then open **Administration
+settings → Additional settings**, configure the ChurchTools tenant URL, and open
+**Personal settings → Additional settings** to connect your ChurchTools account.
 
 The development port binds to `127.0.0.1` by default and is therefore not
 published to the local network.
@@ -119,7 +123,8 @@ The verified remote boundary is recorded in
 
 ## Security
 
-- Only hosted `https://*.church.tools` tenant URLs are accepted.
+- Only hosted `https://*.church.tools` tenant URLs are accepted (configured by the administrator).
+- The Matrix homeserver URL is configured by the administrator and defaults to `https://chat.church.tools`.
 - ChurchTools and Matrix access tokens are encrypted through Nextcloud's crypto
   API; the CT Chat password is never stored.
 - Secrets never appear in normal API responses, browser storage, or logs.

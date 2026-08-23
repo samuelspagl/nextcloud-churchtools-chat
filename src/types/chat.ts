@@ -141,3 +141,8 @@ export interface SettingsState {
 	matrixUserId: string
 	bootstrapError?: IntegrationError | null
 }
+
+export interface AdminSettingsState {
+	churchToolsTenantUrl: string
+	matrixServerUrl: string
+}

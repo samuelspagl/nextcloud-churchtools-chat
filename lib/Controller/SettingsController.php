@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace OCA\ChurchToolsChat\Controller;
 
 use OCA\ChurchToolsChat\Exception\IntegrationException;
+use OCA\ChurchToolsChat\Service\AppConfigService;
 use OCA\ChurchToolsChat\Service\ChurchToolsClient;
 use OCA\ChurchToolsChat\Service\MatrixClient;
 use OCA\ChurchToolsChat\Service\SecretService;
-use OCA\ChurchToolsChat\Service\TenantUrlValidator;
 use OCA\ChurchToolsChat\Service\UserContext;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
@@ -19,7 +19,7 @@ final class SettingsController extends ApiController {
 		IRequest $request,
 		LoggerInterface $logger,
 		private readonly UserContext $userContext,
-		private readonly TenantUrlValidator $urlValidator,
+		private readonly AppConfigService $appConfig,
 		private readonly SecretService $secrets,
 		private readonly ChurchToolsClient $churchTools,
 		private readonly MatrixClient $matrix,
@@ -29,18 +29,25 @@ final class SettingsController extends ApiController {
 
 	/** @NoAdminRequired */
 	public function get(): JSONResponse {
-		return $this->respond(fn (): array => $this->secrets->getPublicState($this->userContext->getUserId()));
+		return $this->respond(function (): array {
+			$userId = $this->userContext->getUserId();
+			$state = $this->secrets->getPublicState($userId);
+			$tenantUrl = $this->appConfig->getTenantUrl();
+			$state['tenantUrl'] = $tenantUrl;
+			$state['configured'] = $state['configured'] && $tenantUrl !== '';
+			return $state;
+		});
 	}
 
 	/** @NoAdminRequired */
-	public function save(string $tenantUrl, string $token, ?string $matrixPassword = null): JSONResponse {
-		return $this->respond(function () use ($tenantUrl, $token, $matrixPassword): array {
+	public function save(string $token, ?string $matrixPassword = null): JSONResponse {
+		return $this->respond(function () use ($token, $matrixPassword): array {
 			$userId = $this->userContext->getUserId();
-			$tenantUrl = $this->urlValidator->normalize($tenantUrl);
+			$tenantUrl = $this->appConfig->requireTenantUrl();
 			$previous = $this->secrets->getPublicState($userId);
 			$token = trim($token);
 			if ($token === '') {
-				if (!$previous['configured'] || $previous['tenantUrl'] !== $tenantUrl) {
+				if (!$previous['configured']) {
 					throw new IntegrationException('missing_token', 'Enter a ChurchTools access token.');
 				}
 				$token = $this->secrets->getChurchToolsToken($userId);
@@ -49,11 +56,14 @@ final class SettingsController extends ApiController {
 			$matrixPassword = (string)$matrixPassword;
 
 			$identity = $this->churchTools->validateIdentity($tenantUrl, $token);
+			$previousServerName = $previous['matrixUserId'] !== ''
+				? substr((string)strstr($previous['matrixUserId'], ':'), 1)
+				: '';
 			$preserveMatrixSession = $matrixPassword === ''
 				&& $previous['matrixConnected']
-				&& $previous['tenantUrl'] === $tenantUrl
-				&& strtolower($previous['personGuid']) === strtolower($identity['guid']);
-			$this->secrets->saveChurchTools($userId, $tenantUrl, $token, $identity);
+				&& strtolower($previous['personGuid']) === strtolower($identity['guid'])
+				&& $previousServerName === $this->appConfig->getMatrixServerName();
+			$this->secrets->saveChurchTools($userId, $token, $identity);
 			if (!$preserveMatrixSession) {
 				$this->secrets->clearMatrixSession($userId);
 			}
@@ -73,6 +83,8 @@ final class SettingsController extends ApiController {
 
 			return [
 				...$this->secrets->getPublicState($userId),
+				'tenantUrl' => $tenantUrl,
+				'configured' => $previous['configured'] && $tenantUrl !== '',
 				'bootstrapError' => $bootstrapError,
 			];
 		});

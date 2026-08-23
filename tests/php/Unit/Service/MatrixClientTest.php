@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace OCA\ChurchToolsChat\Tests\Unit\Service;
 
 use OCA\ChurchToolsChat\Exception\IntegrationException;
+use OCA\ChurchToolsChat\Service\AppConfigService;
 use OCA\ChurchToolsChat\Service\MatrixClient;
 use OCA\ChurchToolsChat\Service\MatrixUserId;
+use OCA\ChurchToolsChat\Service\TenantUrlValidator;
 use OCP\Http\Client\IClient;
 use OCP\Http\Client\IClientService;
 use OCP\Http\Client\IResponse;
+use OCP\IConfig;
 use PHPUnit\Framework\TestCase;
 
 final class MatrixClientTest extends TestCase {
@@ -23,7 +26,12 @@ final class MatrixClientTest extends TestCase {
 		$this->httpClient = $this->createMock(IClient::class);
 		$this->response = $this->createMock(IResponse::class);
 		$this->clientService->method('newClient')->willReturn($this->httpClient);
-		$this->matrix = new MatrixClient($this->clientService, new MatrixUserId());
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(
+			static fn (string $appId, string $key, string $default = ''): string => $key === 'matrix_server_url' ? $default : '',
+		);
+		$appConfig = new AppConfigService($config, new TenantUrlValidator());
+		$this->matrix = new MatrixClient($this->clientService, new MatrixUserId($appConfig), $appConfig);
 	}
 
 	public function testDownloadsAuthenticatedThumbnailFromFixedMatrixHost(): void {

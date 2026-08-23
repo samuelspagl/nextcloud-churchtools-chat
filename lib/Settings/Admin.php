@@ -1,0 +1,26 @@
+<?php
+
+declare(strict_types=1);
+
+namespace OCA\ChurchToolsChat\Settings;
+
+use OCA\ChurchToolsChat\AppInfo\Application;
+use OCP\AppFramework\Http\TemplateResponse;
+use OCP\Settings\ISettings;
+use OCP\Util;
+
+final class Admin implements ISettings {
+	public function getForm(): TemplateResponse {
+		Util::addScript(Application::APP_ID, Application::APP_ID . '-admin-settings');
+		Util::addStyle(Application::APP_ID, Application::APP_ID . '-admin-settings');
+		return new TemplateResponse(Application::APP_ID, 'admin');
+	}
+
+	public function getSection(): string {
+		return 'additional';
+	}
+
+	public function getPriority(): int {
+		return 50;
+	}
+}

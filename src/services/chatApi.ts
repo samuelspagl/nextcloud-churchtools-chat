@@ -11,6 +11,7 @@ import type {
 	RoomsResponse,
 	SettingsState,
 	SyncResponse,
+	AdminSettingsState,
 } from '../types/chat'
 
 interface ApiEnvelope<T> {
@@ -99,13 +100,23 @@ export async function getSettings(): Promise<SettingsState> {
 	return response.data.data
 }
 
-export async function saveSettings(tenantUrl: string, token: string, matrixPassword: string): Promise<SettingsState> {
-	const response = await axios.post<ApiEnvelope<SettingsState>>(endpoint('/api/settings'), { tenantUrl, token, matrixPassword })
+export async function saveSettings(token: string, matrixPassword: string): Promise<SettingsState> {
+	const response = await axios.post<ApiEnvelope<SettingsState>>(endpoint('/api/settings'), { token, matrixPassword })
 	return response.data.data
 }
 
 export async function deleteSettings(): Promise<void> {
 	await axios.delete(endpoint('/api/settings'))
+}
+
+export async function getAdminSettings(): Promise<AdminSettingsState> {
+	const response = await axios.get<ApiEnvelope<AdminSettingsState>>(endpoint('/api/admin/settings'))
+	return response.data.data
+}
+
+export async function saveAdminSettings(churchToolsTenantUrl: string, matrixServerUrl: string): Promise<AdminSettingsState> {
+	const response = await axios.post<ApiEnvelope<AdminSettingsState>>(endpoint('/api/admin/settings'), { churchToolsTenantUrl, matrixServerUrl })
+	return response.data.data
 }
 
 export function getErrorMessage(error: unknown): string {

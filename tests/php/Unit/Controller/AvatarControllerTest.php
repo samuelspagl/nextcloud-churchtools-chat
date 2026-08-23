@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace OCA\ChurchToolsChat\Tests\Unit\Controller;
 
 use OCA\ChurchToolsChat\Controller\AvatarController;
+use OCA\ChurchToolsChat\Service\AppConfigService;
 use OCA\ChurchToolsChat\Service\MatrixClient;
 use OCA\ChurchToolsChat\Service\MatrixUserId;
 use OCA\ChurchToolsChat\Service\SecretService;
+use OCA\ChurchToolsChat\Service\TenantUrlValidator;
 use OCA\ChurchToolsChat\Service\UserContext;
 use OCP\Http\Client\IClientService;
 use OCP\IConfig;
@@ -36,12 +38,16 @@ final class AvatarControllerTest extends TestCase {
 			->method('warning')
 			->with('ChurchTools Chat avatar request failed', ['errorCode' => 'matrix_not_connected']);
 
+		$configApp = $this->createMock(\OCP\IConfig::class);
+		$configApp->method('getAppValue')->willReturn('');
+		$appConfig = new AppConfigService($configApp, new TenantUrlValidator());
+
 		$controller = new AvatarController(
 			$request,
 			$logger,
 			new UserContext($userSession),
 			new SecretService($config, $crypto),
-			new MatrixClient($clientService, new MatrixUserId()),
+			new MatrixClient($clientService, new MatrixUserId($appConfig), $appConfig),
 		);
 
 		$response = $controller->thumbnail('mxc://chat.church.tools/avatar');

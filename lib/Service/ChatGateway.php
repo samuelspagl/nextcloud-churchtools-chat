@@ -13,6 +13,7 @@ final class ChatGateway {
 		private readonly MatrixClient $matrix,
 		private readonly MatrixUserId $matrixUserId,
 		private readonly MatrixRoomMapper $roomMapper,
+		private readonly AppConfigService $appConfig,
 	) {
 	}
 
@@ -37,7 +38,7 @@ final class ChatGateway {
 		$state = $this->secrets->getPublicState($userId);
 		$matrixToken = $this->secrets->getMatrixToken($userId);
 		$persons = $this->churchTools->searchPersons(
-			$this->secrets->getTenantUrl($userId),
+			$this->appConfig->requireTenantUrl(),
 			$this->secrets->getChurchToolsToken($userId),
 			$query,
 		);
@@ -75,7 +76,7 @@ final class ChatGateway {
 		}
 
 		$person = $this->churchTools->getPerson(
-			$this->secrets->getTenantUrl($userId),
+			$this->appConfig->requireTenantUrl(),
 			$this->secrets->getChurchToolsToken($userId),
 			$personId,
 		);
@@ -132,7 +133,7 @@ final class ChatGateway {
 			'rooms' => $this->normalizeRooms($sync, $matrixToken, $currentMatrixUserId, $directRooms),
 			'nextBatch' => isset($sync['next_batch']) ? (string)$sync['next_batch'] : null,
 			'churchToolsChats' => $this->churchTools->getChats(
-				$this->secrets->getTenantUrl($userId),
+				$this->appConfig->requireTenantUrl(),
 				$this->secrets->getChurchToolsToken($userId),
 			),
 		];

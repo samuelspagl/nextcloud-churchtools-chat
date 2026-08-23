@@ -9,7 +9,6 @@ use OCP\IConfig;
 use OCP\Security\ICrypto;
 
 final class SecretService {
-	private const TENANT_URL = 'tenant_url';
 	private const CT_TOKEN = 'churchtools_token';
 	private const CT_PERSON_ID = 'churchtools_person_id';
 	private const CT_PERSON_GUID = 'churchtools_person_guid';
@@ -26,8 +25,7 @@ final class SecretService {
 	}
 
 	/** @param array{id:int,guid:string,displayName:string,canChat:bool} $identity */
-	public function saveChurchTools(string $userId, string $tenantUrl, string $token, array $identity): void {
-		$this->config->setUserValue($userId, Application::APP_ID, self::TENANT_URL, $tenantUrl);
+	public function saveChurchTools(string $userId, string $token, array $identity): void {
 		$this->config->setUserValue($userId, Application::APP_ID, self::CT_TOKEN, $this->crypto->encrypt($token));
 		$this->config->setUserValue($userId, Application::APP_ID, self::CT_PERSON_ID, (string)$identity['id']);
 		$this->config->setUserValue($userId, Application::APP_ID, self::CT_PERSON_GUID, $identity['guid']);
@@ -49,18 +47,16 @@ final class SecretService {
 	}
 
 	public function clearAll(string $userId): void {
-		foreach ([self::TENANT_URL, self::CT_TOKEN, self::CT_PERSON_ID, self::CT_PERSON_GUID, self::CT_DISPLAY_NAME, self::CT_CAN_CHAT, self::MATRIX_TOKEN, self::MATRIX_USER_ID, self::MATRIX_DEVICE_ID] as $key) {
+		foreach ([self::CT_TOKEN, self::CT_PERSON_ID, self::CT_PERSON_GUID, self::CT_DISPLAY_NAME, self::CT_CAN_CHAT, self::MATRIX_TOKEN, self::MATRIX_USER_ID, self::MATRIX_DEVICE_ID] as $key) {
 			$this->config->deleteUserValue($userId, Application::APP_ID, $key);
 		}
 	}
 
-	/** @return array{configured:bool,tenantUrl:string,personId:int|null,personGuid:string,displayName:string,canChat:bool|null,matrixConnected:bool,matrixUserId:string} */
+	/** @return array{configured:bool,personId:int|null,personGuid:string,displayName:string,canChat:bool|null,matrixConnected:bool,matrixUserId:string} */
 	public function getPublicState(string $userId): array {
-		$tenantUrl = $this->getValue($userId, self::TENANT_URL);
 		$canChat = $this->getValue($userId, self::CT_CAN_CHAT);
 		return [
-			'configured' => $tenantUrl !== '' && $this->getValue($userId, self::CT_TOKEN) !== '',
-			'tenantUrl' => $tenantUrl,
+			'configured' => $this->getValue($userId, self::CT_TOKEN) !== '',
 			'personId' => ($value = $this->getValue($userId, self::CT_PERSON_ID)) !== '' ? (int)$value : null,
 			'personGuid' => $this->getValue($userId, self::CT_PERSON_GUID),
 			'displayName' => $this->getValue($userId, self::CT_DISPLAY_NAME),
@@ -72,10 +68,6 @@ final class SecretService {
 
 	public function getChurchToolsToken(string $userId): string {
 		return $this->decryptValue($userId, self::CT_TOKEN);
-	}
-
-	public function getTenantUrl(string $userId): string {
-		return $this->getValue($userId, self::TENANT_URL);
 	}
 
 	public function getMatrixToken(string $userId): string {

@@ -4,7 +4,8 @@ Verified against the tenant OpenAPI and public Matrix discovery on 2026-08-21.
 
 ## ChurchTools REST
 
-Base URL: the user-configured hosted `https://<tenant>.church.tools` instance.
+Base URL: the hosted `https://<tenant>.church.tools` instance configured by the
+administrator in the app's administration settings.
 
 Authentication uses the documented header form:
 
@@ -39,14 +40,16 @@ private web endpoints.
 
 ## Matrix transport
 
-Homeserver: `https://chat.church.tools`.
+Homeserver: configured by the administrator in the app's administration settings.
+It defaults to `https://chat.church.tools`. The server name used in the derived
+Matrix user ID is the host of the configured homeserver URL.
 
 Public discovery currently advertises Matrix Client-Server API versions through
 `v1.12` and supports `m.login.password`. Users supply only their CT Chat
 password in the personal Nextcloud settings. The app takes the GUID from the
 validated ChurchTools `/api/whoami` response, normalizes its hexadecimal
 letters to lowercase, and derives the Matrix identifier as
-`@ct_<lowercase-guid>:chat.church.tools`. It submits this value as an
+`@ct_<lowercase-guid>:<matrix-server-name>`. It submits this value as an
 `m.id.user` identifier to `POST /_matrix/client/v3/login`. The returned access
 token is persisted through Nextcloud encryption; the password is never stored.
 
