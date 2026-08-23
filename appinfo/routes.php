@@ -8,6 +8,8 @@ return [
 		['name' => 'settings#get', 'url' => '/api/settings', 'verb' => 'GET'],
 		['name' => 'settings#save', 'url' => '/api/settings', 'verb' => 'POST'],
 		['name' => 'settings#destroy', 'url' => '/api/settings', 'verb' => 'DELETE'],
+		['name' => 'admin_settings#get', 'url' => '/api/admin/settings', 'verb' => 'GET'],
+		['name' => 'admin_settings#save', 'url' => '/api/admin/settings', 'verb' => 'POST'],
 		['name' => 'chat#status', 'url' => '/api/status', 'verb' => 'GET'],
 		['name' => 'avatar#thumbnail', 'url' => '/api/avatar', 'verb' => 'GET'],
 		['name' => 'media#thumbnail', 'url' => '/api/media/thumbnail', 'verb' => 'GET'],

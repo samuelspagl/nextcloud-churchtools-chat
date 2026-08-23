@@ -5,12 +5,10 @@ import NcButton from '@nextcloud/vue/components/NcButton'
 import NcNoteCard from '@nextcloud/vue/components/NcNoteCard'
 import NcPasswordField from '@nextcloud/vue/components/NcPasswordField'
 import NcSettingsSection from '@nextcloud/vue/components/NcSettingsSection'
-import NcTextField from '@nextcloud/vue/components/NcTextField'
 import { computed, onMounted, shallowRef } from 'vue'
 import { deleteSettings, getErrorMessage, getSettings, saveSettings } from './services/chatApi'
 import type { IntegrationError, SettingsState } from './types/chat'
 
-const tenantUrl = shallowRef('https://efg-darmstadt.church.tools')
 const token = shallowRef('')
 const matrixPassword = shallowRef('')
 const state = shallowRef<SettingsState | null>(null)
@@ -23,7 +21,6 @@ const saveDisabled = computed(() => saving.value
 onMounted(async () => {
 	try {
 		state.value = await getSettings()
-		if (state.value.tenantUrl) tenantUrl.value = state.value.tenantUrl
 	} catch (error) {
 		showError(getErrorMessage(error))
 	}
@@ -33,7 +30,7 @@ async function save() {
 	saving.value = true
 	bootstrapError.value = null
 	try {
-		state.value = await saveSettings(tenantUrl.value, token.value, matrixPassword.value)
+		state.value = await saveSettings(token.value, matrixPassword.value)
 		bootstrapError.value = state.value.bootstrapError ?? null
 		token.value = ''
 		if (state.value.matrixConnected) {
@@ -70,7 +67,6 @@ async function disconnect() {
 		:name="t('churchtools_chat', 'ChurchTools Chat')"
 		:description="t('churchtools_chat', 'Connect your own ChurchTools account. Secret values are encrypted and are never shown again after saving.')">
 		<div class="settings-form">
-			<NcTextField v-model="tenantUrl" :label="t('churchtools_chat', 'ChurchTools tenant URL')" autocomplete="url" />
 			<NcPasswordField v-model="token" :label="t('churchtools_chat', 'ChurchTools access token')" autocomplete="new-password" />
 			<NcPasswordField
 				v-model="matrixPassword"
@@ -86,6 +82,9 @@ async function disconnect() {
 				</NcButton>
 				<NcButton v-if="state?.configured" variant="error" @click="disconnect">{{ t('churchtools_chat', 'Disconnect') }}</NcButton>
 			</div>
+			<NcNoteCard v-if="state && !state.tenantUrl" type="warning">
+				{{ t('churchtools_chat', 'The administrator has not configured the ChurchTools server yet. Ask your administrator to set the ChurchTools tenant URL in the app settings.') }}
+			</NcNoteCard>
 			<NcNoteCard v-if="state?.configured" type="success">
 				{{ t('churchtools_chat', 'Connected as') }} {{ state.displayName }} {{ t('churchtools_chat', 'to') }} {{ state.tenantUrl }}.
 			</NcNoteCard>

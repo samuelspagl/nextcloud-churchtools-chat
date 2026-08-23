@@ -6,11 +6,11 @@ namespace OCA\ChurchToolsChat\Service;
 
 use JsonException;
 use OCA\ChurchToolsChat\Exception\IntegrationException;
+use OCA\ChurchToolsChat\Service\AppConfigService;
 use OCP\Http\Client\IClientService;
 use Throwable;
 
 final class MatrixClient {
-	private const BASE_URL = 'https://chat.church.tools';
 	private const AVATAR_SIZE = 128;
 	private const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 	private const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
@@ -25,7 +25,12 @@ final class MatrixClient {
 	public function __construct(
 		private readonly IClientService $clientService,
 		private readonly MatrixUserId $matrixUserId,
+		private readonly AppConfigService $appConfig,
 	) {
+	}
+
+	private function baseUrl(): string {
+		return $this->appConfig->getMatrixBaseUrl();
 	}
 
 	/** @return array{access_token:string,user_id:string,device_id?:string} */
@@ -261,7 +266,7 @@ final class MatrixClient {
 		];
 
 		try {
-			$response = $this->clientService->newClient()->get(self::BASE_URL . $path, $options);
+			$response = $this->clientService->newClient()->get($this->baseUrl() . $path, $options);
 			$status = $response->getStatusCode();
 			if ($status === 401 || $status === 403) {
 				throw new IntegrationException('matrix_session_expired', 'The Matrix session is unavailable or expired.', 401);
@@ -320,7 +325,7 @@ final class MatrixClient {
 			'stream' => true,
 		];
 		try {
-			$response = $this->clientService->newClient()->get(self::BASE_URL . '/_matrix/media/v3/download/' . rawurlencode($serverName) . '/' . rawurlencode($mediaId), $options);
+			$response = $this->clientService->newClient()->get($this->baseUrl() . '/_matrix/media/v3/download/' . rawurlencode($serverName) . '/' . rawurlencode($mediaId), $options);
 			$status = $response->getStatusCode();
 			if ($status === 401 || $status === 403) throw new IntegrationException('matrix_session_expired', 'The Matrix session is unavailable or expired.', 401);
 			if ($status === 404) throw new IntegrationException('matrix_media_not_found', 'The Matrix attachment was not found.', 404);
@@ -409,9 +414,9 @@ final class MatrixClient {
 		try {
 			$client = $this->clientService->newClient();
 			$response = match ($method) {
-				'GET' => $client->get(self::BASE_URL . $path, $options),
-				'POST' => $client->post(self::BASE_URL . $path, $options),
-				'PUT' => $client->put(self::BASE_URL . $path, $options),
+				'GET' => $client->get($this->baseUrl() . $path, $options),
+				'POST' => $client->post($this->baseUrl() . $path, $options),
+				'PUT' => $client->put($this->baseUrl() . $path, $options),
 				default => throw new IntegrationException('unsupported_method', 'Unsupported Matrix request method.', 500),
 			};
 			$status = $response->getStatusCode();

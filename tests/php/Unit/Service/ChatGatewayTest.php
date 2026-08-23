@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace OCA\ChurchToolsChat\Tests\Unit\Service;
 
+use OCA\ChurchToolsChat\Service\AppConfigService;
 use OCA\ChurchToolsChat\Service\ChatGateway;
 use OCA\ChurchToolsChat\Service\ChurchToolsClient;
 use OCA\ChurchToolsChat\Service\MatrixClient;
 use OCA\ChurchToolsChat\Service\MatrixRoomMapper;
 use OCA\ChurchToolsChat\Service\MatrixUserId;
 use OCA\ChurchToolsChat\Service\SecretService;
+use OCA\ChurchToolsChat\Service\TenantUrlValidator;
 use OCP\Http\Client\IClient;
 use OCP\Http\Client\IClientService;
 use OCP\Http\Client\IResponse;
@@ -44,7 +46,6 @@ final class ChatGatewayTest extends TestCase {
 		$config = $this->createMock(IConfig::class);
 		$config->method('getUserValue')->willReturnCallback(
 			static fn (string $userId, string $appId, string $key, string $default): string => match ($key) {
-				'tenant_url' => 'https://tenant.church.tools',
 				'churchtools_token' => 'encrypted-ct-token',
 				'churchtools_person_id' => '7',
 				'matrix_access_token' => 'encrypted-matrix-token',
@@ -108,14 +109,20 @@ final class ChatGatewayTest extends TestCase {
 		);
 		$clientService = $this->createMock(IClientService::class);
 		$clientService->method('newClient')->willReturn($httpClient);
-		$matrixUserId = new MatrixUserId();
+		$appConfig = $this->createMock(\OCP\IConfig::class);
+		$appConfig->method('getAppValue')->willReturnCallback(
+			static fn (string $appId, string $key, string $default = ''): string => $key === 'churchtools_tenant_url' ? 'https://tenant.church.tools' : $default,
+		);
+		$appConfigService = new AppConfigService($appConfig, new TenantUrlValidator());
+		$matrixUserId = new MatrixUserId($appConfigService);
 
 		return new ChatGateway(
 			new SecretService($config, $crypto),
 			new ChurchToolsClient($clientService),
-			new MatrixClient($clientService, $matrixUserId),
+			new MatrixClient($clientService, $matrixUserId, $appConfigService),
 			$matrixUserId,
 			new MatrixRoomMapper(),
+			$appConfigService,
 		);
 	}
 }

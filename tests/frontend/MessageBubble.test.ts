@@ -5,6 +5,42 @@ import { defineComponent } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import MessageBubble from '../../src/components/MessageBubble.vue'
 
+const mocks = vi.hoisted(() => {
+	const pick = vi.fn()
+	const builder = {
+		setMultiSelect: vi.fn(),
+		allowDirectories: vi.fn(),
+		setCanPick: vi.fn(),
+		setType: vi.fn(),
+		build: vi.fn(() => ({ pick })),
+	}
+	builder.setMultiSelect.mockReturnValue(builder)
+	builder.allowDirectories.mockReturnValue(builder)
+	builder.setCanPick.mockReturnValue(builder)
+	builder.setType.mockReturnValue(builder)
+	const FilePickerClosed = class FilePickerClosed extends Error {}
+
+	return {
+		pick,
+		builder,
+		FilePickerClosed,
+		getFilePickerBuilder: vi.fn(() => builder),
+		saveAttachment: vi.fn(),
+	}
+})
+
+vi.mock('@nextcloud/dialogs', () => ({
+	FilePickerClosed: mocks.FilePickerClosed,
+	getFilePickerBuilder: mocks.getFilePickerBuilder,
+	showError: vi.fn(),
+	showSuccess: vi.fn(),
+}))
+
+vi.mock('../../src/services/chatApi', () => ({
+	getErrorMessage: vi.fn(),
+	saveAttachment: mocks.saveAttachment,
+}))
+
 vi.mock('@nextcloud/l10n', async (importOriginal) => ({
 	...await importOriginal<typeof import('@nextcloud/l10n')>(),
 	translate: (_app: string, text: string) => text,
@@ -23,7 +59,7 @@ const MessageReferencePreviewStub = defineComponent({
 })
 
 describe('MessageBubble', () => {
-	function mountMessageBubble() {
+	function mountMessageBubble(withAttachment = false) {
 		return shallowMount(MessageBubble, {
 			props: {
 				currentUserId: '@me:example.test',
@@ -32,6 +68,13 @@ describe('MessageBubble', () => {
 					sender: '@me:example.test',
 					body: 'See https://cloud.example.test/apps/deck/card/6',
 					timestamp: 1_700_000_000_000,
+					attachment: withAttachment ? {
+						kind: 'image',
+						filename: 'photo.jpg',
+						mimeType: 'image/jpeg',
+						mxcUrl: 'mxc://matrix.example.test/photo',
+						size: 123,
+					} : undefined,
 				},
 			},
 			global: {
@@ -51,6 +94,32 @@ describe('MessageBubble', () => {
 		expect(bubble.find('.reference-preview-stub').exists()).toBe(false)
 		expect(preview.element.parentElement?.classList).toContain('reference-preview-stub')
 		expect(preview.element.previousElementSibling?.classList).toContain('message-slot')
+	})
+
+	it('configures the picker to confirm the current folder before saving an attachment', async () => {
+		mocks.pick.mockResolvedValueOnce('/Photos')
+		mocks.saveAttachment.mockResolvedValueOnce({ path: 'Photos/photo.jpg' })
+		const wrapper = mountMessageBubble(true)
+
+		await wrapper.get('.message__actions').findAll('nc-button-stub')[1].trigger('click')
+
+		expect(mocks.getFilePickerBuilder).toHaveBeenCalledWith('Choose a folder')
+		expect(mocks.builder.setMultiSelect).toHaveBeenCalledWith(false)
+		expect(mocks.builder.allowDirectories).toHaveBeenCalledWith(true)
+		expect(mocks.builder.setCanPick.mock.calls[0]?.[0]({ type: 'folder' })).toBe(true)
+		expect(mocks.builder.setCanPick.mock.calls[0]?.[0]({ type: 'file' })).toBe(false)
+		expect(mocks.builder.setType).toHaveBeenCalledWith(1)
+		expect(mocks.saveAttachment).toHaveBeenCalledWith('mxc://matrix.example.test/photo', 'Photos', 'photo.jpg')
+	})
+
+	it('does not save when the folder picker is closed', async () => {
+		mocks.saveAttachment.mockClear()
+		mocks.pick.mockRejectedValueOnce(new mocks.FilePickerClosed())
+		const wrapper = mountMessageBubble(true)
+
+		await wrapper.get('.message__actions').findAll('nc-button-stub')[1].trigger('click')
+
+		expect(mocks.saveAttachment).not.toHaveBeenCalled()
 	})
 
 	it('keeps reply and reaction actions in the bubble hover menu', async () => {

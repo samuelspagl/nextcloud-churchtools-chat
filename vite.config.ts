@@ -18,6 +18,7 @@ const testConfig = {
 export default createAppConfig({
 	main: 'src/main.ts',
 	settings: 'src/settings.ts',
+	'admin-settings': 'src/admin-settings.ts',
 }, {
 	config: testConfig,
 })

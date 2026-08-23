@@ -5,9 +5,9 @@
     <name>ChurchTools Chat</name>
     <summary>ChurchTools chat inside Nextcloud</summary>
     <description><![CDATA[A chat-only Nextcloud app for ChurchTools Chat with person search, direct conversations, a native Vue interface, Markdown rendering and Smart Picker support.]]></description>
-    <version>0.3.20</version>
+    <version>0.4.0</version>
     <licence>AGPL-3.0-or-later</licence>
-    <author>EFG Darmstadt</author>
+    <author>Samuel Spagl</author>
     <namespace>ChurchToolsChat</namespace>
     <category>social</category>
     <website>https://github.com/samuelspagl/nextcloud-churchtools-chat</website>
@@ -31,6 +31,9 @@
         </navigation>
     </navigations>
     <settings>
+        <personal-section>OCA\ChurchToolsChat\Settings\PersonalSection</personal-section>
         <personal>OCA\ChurchToolsChat\Settings\Personal</personal>
+        <admin-section>OCA\ChurchToolsChat\Settings\AdminSection</admin-section>
+        <admin>OCA\ChurchToolsChat\Settings\Admin</admin>
     </settings>
 </info>
