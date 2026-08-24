@@ -2,6 +2,18 @@
 
 All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
+## [0.5.0]
+
+### Added
+
+- Retry-safe message sending and a foundation for message relations.
+- Resilient sync lifecycle and session-recovery UX.
+
+### Changed
+
+- Improved read state, pagination, scroll, and unread handling.
+- Marked the app as experimental in settings, description, and README.
+
 ## [0.4.0]
 
 ### Changed
