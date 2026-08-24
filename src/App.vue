@@ -49,6 +49,8 @@ const {
 	send,
 	retry,
 	react,
+	deleteMessage,
+	loadOlderMessages,
 	toggleDetails,
 	closeDetails,
 } = useChat()
@@ -210,10 +212,13 @@ async function retryMessage(message: ChatMessage) {
 						:messages="messages"
 						:current-user-id="status?.matrixUserId || ''"
 						:loading="loadingMessages"
+						:has-more="activeRoom?.hasMore ?? false"
 						:focus-message-id="focusedMessageId"
+						@load-older="loadOlderMessages(activeRoomId ?? '')"
 						@retry="retryMessage"
 						@reply="replyTarget = $event"
-						@react="reactToMessage" />
+						@react="reactToMessage"
+						@delete="deleteMessage" />
 					<MessageComposer
 						:disabled="!status?.capabilities.send || activeRoom.encrypted"
 						:reply-to="replyTarget"

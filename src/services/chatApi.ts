@@ -93,6 +93,17 @@ export async function editMessage(roomId: string, eventId: string, body: string,
 	return response.data.data
 }
 
+export async function setFullyRead(roomId: string, eventId: string): Promise<void> {
+	await axios.post(
+		endpoint(`/api/rooms/${encodeURIComponent(roomId)}/read-marker`),
+		{ eventId },
+	)
+}
+
+export async function deleteMessage(roomId: string, eventId: string): Promise<void> {
+	await axios.post(endpoint(`/api/rooms/${encodeURIComponent(roomId)}/messages/${encodeURIComponent(eventId)}/redact`))
+}
+
 export async function saveAttachment(mxc: string, directory: string, filename: string): Promise<{ path: string }> {
 	const response = await axios.post<ApiEnvelope<{ path: string }>>(endpoint('/api/media/save'), { mxc, directory, filename })
 	return response.data.data

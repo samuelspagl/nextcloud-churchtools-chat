@@ -30,6 +30,8 @@ export interface ChatMessage {
 	body: string
 	timestamp: number
 	edited?: boolean
+	redacted?: boolean
+	mentionsMe?: boolean
 	relatesTo?: Record<string, unknown> | null
 	reactions?: Record<string, number>
 	status?: 'sending' | 'sent' | 'failed'
@@ -55,6 +57,8 @@ export interface ChatRoom {
 	unreadCount: number
 	limited?: boolean
 	prevBatch?: string | null
+	hasMore?: boolean
+	fullyReadEventId?: string | null
 	lastMessage: ChatMessage | null
 	events: ChatMessage[]
 }

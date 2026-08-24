@@ -18,6 +18,7 @@ import MessageAttachment from './MessageAttachment.vue'
 const props = defineProps<{
 	message: ChatMessage
 	currentUserId: string
+	grouped?: boolean
 	focused?: boolean
 }>()
 
@@ -25,7 +26,11 @@ const emit = defineEmits<{
 	retry: [message: ChatMessage]
 	reply: [message: ChatMessage]
 	react: [message: ChatMessage, emoji: string]
+	delete: [message: ChatMessage]
 }>()
+
+const isDeleted = computed(() => props.message.redacted === true || props.message.body === '')
+const canDelete = computed(() => isOwn.value && props.message.status === 'sent' && !isDeleted.value)
 const isOwn = computed(() => props.message.sender === props.currentUserId)
 const senderLabel = computed(() => messageSenderLabel(props.message, props.currentUserId, t('churchtools_chat', 'You')))
 const savingAttachment = shallowRef(false)
@@ -38,6 +43,7 @@ const formattedTime = computed(() => new Intl.DateTimeFormat(undefined, {
 const replyIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V3l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-.8-5-3.8-10-11-11Z"/></svg>'
 const saveIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h12l4 4v14H5V3Zm2 2v14h12V8.1L16.9 6H7Zm2 0h6v5H9V5Zm1 8v4h4v-4h-4Z"/></svg>'
 const downloadIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3h2v10.2l3.6-3.6L18 11l-6 6-6-6 1.4-1.4 3.6 3.6V3ZM5 19h14v2H5v-2Z"/></svg>'
+const deleteIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v1H4v2h16V4h-5V3H9Zm-3 5 1 12h10l1-12H6Z"/></svg>'
 
 function downloadAttachment() {
 	const attachment = props.message.attachment
@@ -68,7 +74,7 @@ async function saveToNextcloud() {
 </script>
 
 <template>
-	<article class="message" :class="{ 'message--own': isOwn, 'message--focused': focused }" :data-message-id="message.id" tabindex="-1">
+	<article class="message" :class="{ 'message--own': isOwn, 'message--grouped': grouped, 'message--focused': focused, 'message--mention': message.mentionsMe }" :data-message-id="message.id" tabindex="-1">
 		<MessageReferencePreview
 			:message-id="message.id"
 			:text="message.body"
@@ -76,20 +82,22 @@ async function saveToNextcloud() {
 			v-slot="{ preview }">
 			<div class="message__row">
 				<NcAvatar
+					v-if="!grouped"
 					:url="displayableAvatarUrl(message.senderAvatarUrl)"
 					:display-name="senderLabel"
 					:is-no-user="true"
 					:disable-menu="true"
 					:size="32" />
 				<div class="message__content">
-					<header class="message__metadata">
+					<header v-if="!grouped" class="message__metadata">
 						<strong>{{ senderLabel }}</strong>
 						<time :datetime="new Date(message.timestamp).toISOString()">{{ formattedTime }}</time>
 						<span v-if="message.edited">{{ t('churchtools_chat', 'edited') }}</span>
 					</header>
 					<div class="message__bubble-line">
-						<div class="message__bubble" :class="{ 'message__bubble--attachment': message.attachment }">
-							<MessageAttachment v-if="message.attachment" :attachment="message.attachment" :saving="savingAttachment" @save="saveToNextcloud" />
+						<div class="message__bubble" :class="{ 'message__bubble--attachment': message.attachment, 'message__bubble--deleted': isDeleted }">
+							<span v-if="isDeleted">{{ t('churchtools_chat', 'Message deleted') }}</span>
+							<MessageAttachment v-else-if="message.attachment" :attachment="message.attachment" :saving="savingAttachment" @save="saveToNextcloud" />
 							<NcRichText v-else :text="message.body" autolink use-markdown />
 						</div>
 						<MessageReferencePreviewControls :preview="preview" />
@@ -127,6 +135,14 @@ async function saveToNextcloud() {
 								@click="emit('react', message, '👍')">
 								<span aria-hidden="true">👍</span>
 							</NcButton>
+							<NcButton
+								v-if="canDelete"
+								variant="tertiary"
+								:aria-label="t('churchtools_chat', 'Delete message')"
+								:title="t('churchtools_chat', 'Delete message')"
+								@click="emit('delete', message)">
+								<template #icon><NcIconSvgWrapper :svg="deleteIcon" /></template>
+							</NcButton>
 						</div>
 					</div>
 					<div v-if="message.reactions && Object.keys(message.reactions).length > 0" class="message__reactions">
@@ -147,7 +163,11 @@ async function saveToNextcloud() {
 
 <style scoped>
 .message { display: flex; width: 100%; min-width: 0; flex-direction: column; gap: 4px; }
+.message--grouped { margin-block-start: -8px; }
 .message--focused .message__bubble { box-shadow: 0 0 0 3px var(--color-primary-element-light); }
+.message--mention .message__bubble { box-shadow: inset 3px 0 0 var(--color-primary-element); }
+.message--own.message--mention .message__bubble { box-shadow: inset -3px 0 0 var(--color-primary-element-text); }
+.message__bubble--deleted { color: var(--color-text-maxcontrast); font-style: italic; }
 .message__row { display: flex; min-width: 0; align-items: flex-start; gap: 10px; max-width: min(850px, 96%); align-self: flex-start; }
 .message--own .message__row { align-self: flex-end; flex-direction: row-reverse; }
 .message__content { min-width: 0; }

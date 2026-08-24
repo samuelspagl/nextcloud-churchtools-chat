@@ -77,13 +77,21 @@ final class MatrixRoomMapper {
 
 		$avatarUrl = $directTarget !== null ? ($memberMap[$directTarget]['avatarUrl'] ?? null) : null;
 		$avatarUrl ??= $this->stateString($allEvents, 'm.room.avatar', 'url');
-		$messages = $this->events($timelineEvents, $members);
+		$messages = $this->events($timelineEvents, $members, $currentUserId);
 		$lastMessage = $messages === [] ? null : $messages[array_key_last($messages)];
 		$joinedCount = count(array_filter($members, static fn (array $member): bool => $member['membership'] === 'join'));
 
 		$timeline = is_array($room['timeline'] ?? null) ? $room['timeline'] : [];
 		$limited = ($timeline['limited'] ?? false) === true;
 		$prevBatch = isset($timeline['prev_batch']) ? (string)$timeline['prev_batch'] : null;
+
+		$accountData = is_array($room['account_data']['events'] ?? null) ? $room['account_data']['events'] : [];
+		$fullyReadEventId = null;
+		foreach ($accountData as $accountEvent) {
+			if (($accountEvent['type'] ?? '') === 'm.fully_read' && is_array($accountEvent['content'] ?? null)) {
+				$fullyReadEventId = (string)($accountEvent['content']['event_id'] ?? '');
+			}
+		}
 
 		return [
 			'id' => $roomId,
@@ -95,6 +103,7 @@ final class MatrixRoomMapper {
 			'unreadCount' => (int)($room['unread_notifications']['notification_count'] ?? 0),
 			'limited' => $limited,
 			'prevBatch' => $prevBatch,
+			'fullyReadEventId' => $fullyReadEventId,
 			'lastMessage' => $lastMessage,
 			'events' => $messages,
 		];
@@ -105,7 +114,7 @@ final class MatrixRoomMapper {
 	 * @param list<array{id:string,displayName:string,avatarUrl:string|null,membership:string}> $members
 	 * @return list<array<string,mixed>>
 	 */
-	public function events(array $events, array $members): array {
+	public function events(array $events, array $members, ?string $currentUserId = null): array {
 		$memberMap = [];
 		foreach ($members as $member) {
 			$memberMap[$member['id']] = $member;
@@ -148,6 +157,19 @@ final class MatrixRoomMapper {
 			$eventId = (string)($event['event_id'] ?? '');
 			$sender = (string)($event['sender'] ?? '');
 			$member = $memberMap[$sender] ?? null;
+			$mentionsMe = false;
+			if ($currentUserId !== null) {
+				$mentions = is_array($content['m.mentions'] ?? null) ? $content['m.mentions'] : [];
+				$mentionedUserIds = is_array($mentions['user_ids'] ?? null) ? $mentions['user_ids'] : [];
+				if (in_array($currentUserId, $mentionedUserIds, true)) {
+					$mentionsMe = true;
+				} else {
+					$formattedBody = (string)($content['formatted_body'] ?? '');
+					if ($formattedBody !== '' && str_contains($formattedBody, 'matrix.to/#/' . $currentUserId)) {
+						$mentionsMe = true;
+					}
+				}
+			}
 			$attachment = $this->attachment($msgtype, $content);
 			if ($msgtype !== 'm.text' && $attachment === null) {
 				continue;
@@ -160,6 +182,7 @@ final class MatrixRoomMapper {
 				'body' => (string)($replacements[$eventId] ?? $content['body'] ?? ''),
 				'timestamp' => (int)($event['origin_server_ts'] ?? 0),
 				'edited' => isset($replacements[$eventId]),
+				'mentionsMe' => $mentionsMe,
 				'relatesTo' => $relation !== [] ? $relation : null,
 				'reactions' => $reactions[$eventId] ?? [],
 				'attachment' => $attachment,
