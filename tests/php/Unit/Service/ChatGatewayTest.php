@@ -13,6 +13,7 @@ use OCA\ChurchToolsChat\Service\MatrixUserId;
 use OCA\ChurchToolsChat\Service\SecretService;
 use OCA\ChurchToolsChat\Service\TenantUrlValidator;
 use OCP\Http\Client\IClient;
+use Psr\Log\LoggerInterface;
 use OCP\Http\Client\IClientService;
 use OCP\Http\Client\IResponse;
 use OCP\IConfig;
@@ -137,6 +138,7 @@ final class ChatGatewayTest extends TestCase {
 			$matrixUserId,
 			new MatrixRoomMapper(),
 			$appConfigService,
+			$this->createMock(LoggerInterface::class),
 		);
 	}
 

@@ -46,6 +46,9 @@ async function save() {
 	<NcSettingsSection
 		:name="t('churchtools_chat', 'ChurchTools Chat')"
 		:description="t('churchtools_chat', 'Configure the servers used by ChurchTools Chat. These settings apply to all users; each user still connects with their own access token and CT Chat password.')">
+		<NcNoteCard type="warning">
+			{{ t('churchtools_chat', 'This is an experimental app. It may change, be incomplete, or behave unexpectedly; use it with care.') }}
+		</NcNoteCard>
 		<div class="settings-form">
 			<NcTextField
 				v-model="churchToolsTenantUrl"

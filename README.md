@@ -1,5 +1,9 @@
 # ChurchTools Chat for Nextcloud
 
+> **⚠️ Experimental:** This app is still experimental. It may change, be
+> incomplete, or behave unexpectedly. Use it with care and do not rely on it
+> for critical workflows.
+
 A chat-only Nextcloud app with a Talk-like Vue 3 interface, Markdown rendering,
 Nextcloud Smart Picker support, and per-user ChurchTools credentials.
 It can search visible ChurchTools people by name and start or reopen a Matrix

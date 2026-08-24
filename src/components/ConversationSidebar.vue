@@ -56,9 +56,10 @@ function formatTime(timestamp?: number): string {
 
 function searchPreview(result: VisibleConversationSearchResult): string {
 	if (result.message) return `${result.message.senderName || result.message.sender}: ${result.message.body || result.message.attachment?.filename || ''}`
-	return result.room.encrypted
-		? t('churchtools_chat', 'Encrypted room — unsupported')
-		: (result.room.lastMessage?.body || t('churchtools_chat', 'No messages yet'))
+	if (result.room.encrypted) return t('churchtools_chat', 'Encrypted room — unsupported')
+	const last = result.room.lastMessage
+	if (!last) return t('churchtools_chat', 'No messages yet')
+	return last.body || last.attachment?.filename || t('churchtools_chat', 'No messages yet')
 }
 
 const newChatIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-8l-5 4v-4H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm0 2v11h5v1.8l2.2-1.8H20V5H4Zm9 2v3h3v2h-3v3h-2v-3H8v-2h3V7h2Z"/></svg>'

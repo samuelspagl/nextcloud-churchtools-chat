@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\ChurchToolsChat\Service;
 
 use OCA\ChurchToolsChat\Exception\IntegrationException;
+use Psr\Log\LoggerInterface;
 
 final class ChatGateway {
 	public function __construct(
@@ -14,6 +15,7 @@ final class ChatGateway {
 		private readonly MatrixUserId $matrixUserId,
 		private readonly MatrixRoomMapper $roomMapper,
 		private readonly AppConfigService $appConfig,
+		private readonly LoggerInterface $logger,
 	) {
 	}
 
@@ -131,7 +133,7 @@ final class ChatGateway {
 		$currentMatrixUserId = $this->secrets->getMatrixUserId($userId);
 		$directRooms = $this->resolveDirectRooms($sync, $matrixToken, $currentMatrixUserId);
 		return [
-			'rooms' => $this->normalizeRooms($sync, $matrixToken, $currentMatrixUserId, $directRooms),
+			'rooms' => $this->normalizeRooms($sync, $matrixToken, $currentMatrixUserId, $directRooms, true),
 			'nextBatch' => isset($sync['next_batch']) ? (string)$sync['next_batch'] : null,
 			'churchToolsChats' => $this->churchTools->getChats(
 				$this->appConfig->requireTenantUrl(),
@@ -152,7 +154,8 @@ final class ChatGateway {
 			);
 		}
 		$members = $this->roomMapper->members($memberEvents, $this->profiles($matrixToken, $memberEvents));
-		$events = $this->roomMapper->events(is_array($result['chunk'] ?? null) ? $result['chunk'] : [], $members);
+		$currentMatrixUserId = $this->secrets->getMatrixUserId($userId);
+		$events = $this->roomMapper->events(is_array($result['chunk'] ?? null) ? $result['chunk'] : [], $members, $currentMatrixUserId);
 		return [
 			'events' => array_reverse($events),
 			'start' => isset($result['start']) ? (string)$result['start'] : null,
@@ -174,7 +177,8 @@ final class ChatGateway {
 			$memberEvents = $this->syntheticMembersFromSenders($events);
 		}
 		$members = $this->roomMapper->members($memberEvents, $this->profiles($matrixToken, $memberEvents));
-		return ['events' => $this->roomMapper->events($events, $members)];
+		$currentMatrixUserId = $this->secrets->getMatrixUserId($userId);
+		return ['events' => $this->roomMapper->events($events, $members, $currentMatrixUserId)];
 	}
 
 	/** @return array{results:list<array{roomId:string,message:array<string,mixed>}>} */
@@ -184,6 +188,7 @@ final class ChatGateway {
 			throw new IntegrationException('invalid_conversation_search', 'Enter between 2 and 200 characters to search conversations.', 400);
 		}
 		$matrixToken = $this->requireMatrixToken($userId);
+		$currentMatrixUserId = $this->secrets->getMatrixUserId($userId);
 		$rawResults = $this->matrix->searchMessages($matrixToken, $query, $limit);
 		$membersByRoom = [];
 		$results = [];
@@ -199,7 +204,7 @@ final class ChatGateway {
 				}
 				$membersByRoom[$roomId] = $this->roomMapper->members($memberEvents, $this->profiles($matrixToken, $memberEvents));
 			}
-			$events = $this->roomMapper->events([$rawResult['event']], $membersByRoom[$roomId]);
+			$events = $this->roomMapper->events([$rawResult['event']], $membersByRoom[$roomId], $currentMatrixUserId);
 			if ($events !== []) {
 				$results[] = ['roomId' => $roomId, 'message' => $events[0]];
 			}
@@ -256,6 +261,29 @@ final class ChatGateway {
 		return ['eventId' => (string)($result['event_id'] ?? ''), 'transactionId' => $transactionId];
 	}
 
+	public function setFullyRead(string $userId, string $roomId, string $eventId): void {
+		$this->assertRoomId($roomId);
+		$this->assertEventId($eventId);
+		$accessToken = $this->requireMatrixToken($userId);
+		try {
+			$this->matrix->setFullyRead($accessToken, $roomId, $eventId);
+		} catch (IntegrationException $e) {
+			$this->logger->warning('Failed to set fully-read marker', ['exception' => $e]);
+		}
+		try {
+			$this->matrix->sendReadReceipt($accessToken, $roomId, $eventId);
+		} catch (IntegrationException $e) {
+			$this->logger->warning('Failed to send read receipt', ['exception' => $e]);
+		}
+	}
+
+	public function redact(string $userId, string $roomId, string $eventId): void {
+		$this->assertRoomId($roomId);
+		$this->assertEventId($eventId);
+		$transactionId = bin2hex(random_bytes(16));
+		$this->matrix->redact($this->requireMatrixToken($userId), $roomId, $eventId, $transactionId);
+	}
+
 	/** @return array{rooms:list<array<string,mixed>>,nextBatch:string|null} */
 	public function sync(string $userId, ?string $since): array {
 		$matrixToken = $this->requireMatrixToken($userId);
@@ -299,13 +327,13 @@ final class ChatGateway {
 	}
 
 	private function assertRoomId(string $roomId): void {
-		if (!preg_match('/^![A-Za-z0-9._~+=-]+:[A-Za-z0-9.-]+$/', $roomId)) {
+		if (!preg_match('/^![A-Za-z0-9._~+=\/-]+:[A-Za-z0-9.-]+$/', $roomId)) {
 			throw new IntegrationException('invalid_room_id', 'The room identifier is invalid.');
 		}
 	}
 
 	private function assertEventId(string $eventId): void {
-		if (!preg_match('/^[$][A-Za-z0-9._~+=-]+(?::[A-Za-z0-9.-]+)?$/', $eventId)) {
+		if (!preg_match('/^[$][A-Za-z0-9._~+=\/-]+(?::[A-Za-z0-9.-]+)?$/', $eventId)) {
 			throw new IntegrationException('invalid_event_id', 'The event identifier is invalid.');
 		}
 	}
@@ -373,7 +401,7 @@ final class ChatGateway {
 	 * @param array<string,list<string>> $directRooms
 	 * @return list<array<string,mixed>>
 	 */
-	private function normalizeRooms(array $sync, string $matrixToken, string $currentMatrixUserId, array $directRooms): array {
+	private function normalizeRooms(array $sync, string $matrixToken, string $currentMatrixUserId, array $directRooms, bool $backfillLastMessage = false): array {
 		$joined = $sync['rooms']['join'] ?? [];
 		if (!is_array($joined)) {
 			return [];
@@ -400,11 +428,54 @@ final class ChatGateway {
 			}
 			$profiles = $this->profiles($matrixToken, $memberEvents, $profileCache);
 			$members = $this->roomMapper->members($memberEvents, $profiles);
-			$rooms[] = $this->roomMapper->room($roomId, $room, $directRooms, $currentMatrixUserId, $members);
+			$mapped = $this->roomMapper->room($roomId, $room, $directRooms, $currentMatrixUserId, $members);
+			if ($backfillLastMessage) {
+				$mapped = $this->backfillLatestMessage($matrixToken, $roomId, $currentMatrixUserId, $members, $mapped);
+			}
+			$rooms[] = $mapped;
 		}
 
 		usort($rooms, static fn (array $a, array $b): int => ((int)($b['lastMessage']['timestamp'] ?? 0)) <=> ((int)($a['lastMessage']['timestamp'] ?? 0)));
 		return $rooms;
+	}
+
+	/**
+	 * Fetch the authoritative latest message via the Matrix messages endpoint (dir=b),
+	 * which can be newer than the full-sync timeline snapshot.
+	 *
+	 * @param list<array{id:string,displayName:string,avatarUrl:string|null,membership:string}> $members
+	 * @param array<string,mixed> $room
+	 * @return array<string,mixed>
+	 */
+	private function backfillLatestMessage(string $matrixToken, string $roomId, string $currentMatrixUserId, array $members, array $room): array {
+		try {
+			$latest = $this->matrix->messages($matrixToken, $roomId, null, 1);
+			$chunk = is_array($latest['chunk'] ?? null) ? $latest['chunk'] : [];
+			if ($chunk === []) {
+				return $room;
+			}
+			$mapped = $this->roomMapper->events([$chunk[0]], $members, $currentMatrixUserId);
+			if ($mapped === []) {
+				return $room;
+			}
+			$message = $mapped[0];
+			$knownIds = [];
+			foreach ($room['events'] ?? [] as $event) {
+				if (is_array($event) && isset($event['id'])) {
+					$knownIds[] = $event['id'];
+				}
+			}
+			if (!in_array($message['id'], $knownIds, true)) {
+				$room['events'][] = $message;
+			}
+			if (($room['lastMessage']['timestamp'] ?? 0) <= ($message['timestamp'] ?? 0)) {
+				$room['lastMessage'] = $message;
+			}
+			return $room;
+		} catch (\Throwable) {
+			// Fall back to the full-sync lastMessage if the authoritative fetch fails.
+			return $room;
+		}
 	}
 
 	/**

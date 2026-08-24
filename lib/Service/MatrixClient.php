@@ -411,6 +411,36 @@ final class MatrixClient {
 		);
 	}
 
+	public function setFullyRead(string $accessToken, string $roomId, string $eventId): void {
+		// Private fully-read marker.
+		$this->request(
+			'PUT',
+			'/_matrix/client/v3/rooms/' . rawurlencode($roomId) . '/read_markers',
+			$accessToken,
+			['m.fully_read' => $eventId],
+		);
+	}
+
+	public function sendReadReceipt(string $accessToken, string $roomId, string $eventId): void {
+		// Public read receipt (visible to other sessions, drives notification_count).
+		// POST with thread_id:"main" matches Element / chat.church.tools.
+		$this->request(
+			'POST',
+			'/_matrix/client/v3/rooms/' . rawurlencode($roomId) . '/receipt/m.read/' . rawurlencode($eventId),
+			$accessToken,
+			['thread_id' => 'main'],
+		);
+	}
+
+	/** @return array<string,mixed> */
+	public function redact(string $accessToken, string $roomId, string $eventId, string $transactionId): array {
+		return $this->request(
+			'PUT',
+			'/_matrix/client/v3/rooms/' . rawurlencode($roomId) . '/redact/' . rawurlencode($eventId) . '/' . rawurlencode($transactionId),
+			$accessToken,
+		);
+	}
+
 	/** @return array<string,mixed> */
 	private function request(string $method, string $path, ?string $accessToken = null, ?array $body = null, bool $mapAuthFailure = true): array {
 		$options = [

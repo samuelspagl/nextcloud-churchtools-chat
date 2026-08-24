@@ -1,4 +1,5 @@
 import { computed, onBeforeUnmount, onMounted, readonly, ref, shallowRef } from 'vue'
+import { showError } from '@nextcloud/dialogs'
 import {
 	getErrorCode,
 	getErrorMessage,
@@ -8,10 +9,12 @@ import {
 	getRooms,
 	getStatus,
 	reactToMessage,
+	deleteMessage as deleteMessageRequest,
 	searchConversations as searchConversationsRequest,
 	searchPersons as searchPersonsRequest,
 	searchRoomMessages as searchRoomMessagesRequest,
 	sendMessage,
+	setFullyRead,
 	startDirectChat as startDirectChatRequest,
 	syncRooms,
 } from '../services/chatApi'
@@ -71,8 +74,14 @@ export function useChat() {
 			const response = await getRooms()
 			rooms.value = response.rooms
 			nextBatch.value = response.nextBatch ?? undefined
-			if (rooms.value.length > 0) {
-				await selectRoom(rooms.value[0].id)
+			try {
+				// Like Element's continuous sync, reconcile with a fresh sync before painting
+				// so unread counts reflect the latest notification_count.
+				const fresh = await syncRooms(nextBatch.value)
+				nextBatch.value = fresh.nextBatch ?? nextBatch.value
+				rooms.value = mergeRooms(rooms.value, fresh.rooms)
+			} catch {
+				// Keep the getRooms snapshot if the reconcile sync fails.
 			}
 			void syncLoop()
 		} catch (caught) {
@@ -83,6 +92,7 @@ export function useChat() {
 	}
 
 	async function selectRoom(roomId: string) {
+		const previousRoomId = activeRoomId.value
 		activeRoomId.value = roomId
 		clearMessageSearch()
 		roomDetails.value = null
@@ -92,15 +102,49 @@ export function useChat() {
 		}
 		const selectedRoom = rooms.value.find((room) => room.id === roomId)
 		if (selectedRoom?.encrypted) {
-			rooms.value = rooms.value.map((room) => room.id === roomId ? { ...room, events: [], unreadCount: 0 } : room)
+			rooms.value = rooms.value.map((room) => room.id === roomId ? { ...room, events: [] } : room)
 			return
 		}
 		loadingMessages.value = true
 		try {
 			const response = await getMessages(roomId)
-			rooms.value = rooms.value.map((room) => room.id === roomId ? { ...room, events: response.events, unreadCount: 0 } : room)
+			rooms.value = rooms.value.map((room) => room.id === roomId
+				? {
+					...room,
+					events: response.events,
+					prevBatch: response.start ?? null,
+					hasMore: response.start !== null,
+					lastMessage: response.events[response.events.length - 1] ?? room.lastMessage,
+				}
+				: room)
+			const opened = rooms.value.find((room) => room.id === roomId)
+			const latest = opened?.events[opened.events.length - 1]
+			if (latest && !latest.id.startsWith('nc-')) {
+				await setFullyRead(roomId, latest.id).catch((error) => console.warn('Failed to mark room read', error))
+			}
 		} finally {
 			loadingMessages.value = false
+		}
+		if (previousRoomId && previousRoomId !== roomId) {
+			const previous = rooms.value.find((room) => room.id === previousRoomId)
+			const previousLatest = previous?.events[previous.events.length - 1]
+			if (previousLatest && !previousLatest.id.startsWith('nc-')) {
+				void setFullyRead(previousRoomId, previousLatest.id).catch((error) => console.warn('Failed to mark room read', error))
+			}
+		}
+	}
+
+	async function loadOlderMessages(roomId: string) {
+		const room = rooms.value.find((existing) => existing.id === roomId)
+		if (!room || !room.prevBatch) return
+		try {
+			const response = await getMessages(roomId, room.prevBatch)
+			const older = response.events
+			rooms.value = rooms.value.map((existing) => existing.id === roomId
+				? { ...existing, events: [...older, ...existing.events], prevBatch: response.start ?? null, hasMore: older.length > 0 && response.start !== null }
+				: existing)
+		} catch {
+			// Keep the existing prevBatch so the user can retry loading older messages.
 		}
 	}
 
@@ -127,6 +171,9 @@ export function useChat() {
 			rooms.value = rooms.value.map((room) => room.id === roomId
 				? { ...room, events: room.events.map((message) => message.id === txn ? { ...message, id: sent.eventId, status: 'sent' } : message) }
 				: room)
+			if (!sent.eventId.startsWith('nc-')) {
+				void setFullyRead(roomId, sent.eventId).catch((error) => console.warn('Failed to mark room read', error))
+			}
 		} catch (caught) {
 			rooms.value = rooms.value.map((room) => room.id === roomId
 				? { ...room, events: room.events.map((message) => message.id === txn ? { ...message, status: 'failed' } : message) }
@@ -147,6 +194,24 @@ export function useChat() {
 					: event),
 			}
 			: room)
+	}
+
+	async function deleteMessage(message: ChatMessage) {
+		const roomId = activeRoomId.value
+		if (!roomId || message.id.startsWith('nc-')) return
+		try {
+			await deleteMessageRequest(roomId, message.id)
+			rooms.value = rooms.value.map((room) => room.id === roomId
+				? {
+					...room,
+					events: room.events.map((event) => event.id === message.id
+						? { ...event, redacted: true, body: '', attachment: undefined, reactions: undefined }
+						: event),
+				}
+				: room)
+		} catch (error) {
+			showError(getErrorMessage(error))
+		}
 	}
 
 	async function retry(message: ChatMessage) {
@@ -441,6 +506,7 @@ export function useChat() {
 		messageSearchError: readonly(messageSearchError),
 		focusedMessageId: readonly(focusedMessageId),
 		selectRoom,
+		loadOlderMessages,
 		searchPersons,
 		clearPersonSearch,
 		searchConversations,
@@ -452,6 +518,7 @@ export function useChat() {
 		send,
 		retry,
 		react,
+		deleteMessage,
 		toggleDetails,
 		closeDetails,
 		loadRoomDetails,
