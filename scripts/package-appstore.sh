@@ -15,5 +15,8 @@ mkdir -p "$staging_dir/churchtools_chat"
 rsync --archive --exclude-from=.nextcloudignore ./ "$staging_dir/churchtools_chat/"
 tar --create --gzip --file "$output_path" --directory "$staging_dir" churchtools_chat
 
-tar --list --gzip --file "$output_path" | grep -qx 'churchtools_chat/appinfo/info.xml'
-tar --extract --gzip --to-stdout --file "$output_path" churchtools_chat/appinfo/info.xml | grep -q "<version>$version</version>"
+tar --list --gzip --file "$output_path" > "$staging_dir/contents.txt"
+grep -qx 'churchtools_chat/appinfo/info.xml' "$staging_dir/contents.txt"
+
+tar --extract --gzip --to-stdout --file "$output_path" churchtools_chat/appinfo/info.xml > "$staging_dir/info.xml"
+grep -q "<version>$version</version>" "$staging_dir/info.xml"

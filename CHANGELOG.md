@@ -2,6 +2,13 @@
 
 All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
+## [0.5.1]
+
+### Fixed
+
+- Fixed App Store release packaging failing with a `tar: stdout: write error` caused by a
+  SIGPIPE race between `tar` and `grep -q` during archive verification.
+
 ## [0.5.0]
 
 ### Added
