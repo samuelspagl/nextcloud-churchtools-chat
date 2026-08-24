@@ -130,7 +130,7 @@ onBeforeUnmount(() => {
 .timeline__day {
 	position: sticky;
 	z-index: 2;
-	top: 0;
+	top: 8px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
