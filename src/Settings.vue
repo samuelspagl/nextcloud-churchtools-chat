@@ -66,6 +66,9 @@ async function disconnect() {
 	<NcSettingsSection
 		:name="t('churchtools_chat', 'ChurchTools Chat')"
 		:description="t('churchtools_chat', 'Connect your own ChurchTools account. Secret values are encrypted and are never shown again after saving.')">
+		<NcNoteCard type="warning">
+			{{ t('churchtools_chat', 'This is an experimental app. It may change, be incomplete, or behave unexpectedly; use it with care.') }}
+		</NcNoteCard>
 		<div class="settings-form">
 			<NcPasswordField v-model="token" :label="t('churchtools_chat', 'ChurchTools access token')" autocomplete="new-password" />
 			<NcPasswordField
