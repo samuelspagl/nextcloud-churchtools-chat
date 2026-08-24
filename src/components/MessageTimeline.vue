@@ -2,13 +2,10 @@
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import { translate as t } from '@nextcloud/l10n'
 import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, watch, useTemplateRef } from 'vue'
+import { useDayLabel } from '../composables/useDayLabel'
 import type { ChatMessage } from '../types/chat'
+import { buildTimeline, type TimelineItem } from '../utils/timeline'
 import MessageBubble from './MessageBubble.vue'
-
-interface DecoratedMessage extends ChatMessage {
-	showDateSeparator: boolean
-	grouped: boolean
-}
 
 const props = defineProps<{
 	messages: readonly ChatMessage[]
@@ -18,39 +15,9 @@ const props = defineProps<{
 	focusMessageId: string | null
 }>()
 
-const DAY_MS = 86_400_000
+const { dayLabel } = useDayLabel()
 
-function startOfDay(timestamp: number): number {
-	const date = new Date(timestamp)
-	date.setHours(0, 0, 0, 0)
-	return date.getTime()
-}
-
-const dayFormatter = new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
-const today = startOfDay(Date.now())
-const yesterday = today - DAY_MS
-
-function dayLabel(timestamp: number): string {
-	const day = startOfDay(timestamp)
-	if (day === today) return t('churchtools_chat', 'Today')
-	if (day === yesterday) return t('churchtools_chat', 'Yesterday')
-	return dayFormatter.format(timestamp)
-}
-
-const decoratedMessages = computed<DecoratedMessage[]>(() => {
-	const result: DecoratedMessage[] = []
-	let previous: ChatMessage | null = null
-	for (const message of props.messages) {
-		const showDateSeparator = previous === null || startOfDay(previous.timestamp) !== startOfDay(message.timestamp)
-		const grouped = !showDateSeparator
-			&& previous !== null
-			&& previous.sender === message.sender
-			&& message.timestamp - previous.timestamp < 5 * 60 * 1000
-		result.push({ ...message, showDateSeparator, grouped })
-		previous = message
-	}
-	return result
-})
+const decoratedMessages = computed<TimelineItem[]>(() => buildTimeline(props.messages))
 
 const emit = defineEmits<{
 	retry: [message: ChatMessage]
@@ -160,9 +127,25 @@ onBeforeUnmount(() => {
 .timeline { width: 100%; min-height: 0; overflow-y: auto; }
 .timeline__content { display: flex; width: 100%; min-height: 100%; flex-direction: column; gap: 14px; padding: 24px clamp(16px, 4vw, 56px); }
 .timeline__state { margin: auto; color: var(--color-text-maxcontrast); }
-.timeline__day { display: flex; align-items: center; justify-content: center; margin: 8px 0; color: var(--color-text-maxcontrast); font-size: 12px; }
-.timeline__day::before, .timeline__day::after { flex: 1; height: 1px; content: ''; background: var(--color-border); }
-.timeline__day span { padding: 0 12px; }
+.timeline__day {
+	position: sticky;
+	z-index: 2;
+	top: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin: 4px 0;
+	pointer-events: none;
+}
+.timeline__day span {
+	padding: 4px 14px;
+	border-radius: var(--border-radius-element, var(--border-radius-pill, 9999px));
+	background: var(--color-background-dark);
+	color: var(--color-text-maxcontrast);
+	font-size: 12px;
+	white-space: nowrap;
+	text-transform: capitalize;
+}
 .timeline__load-older { align-self: center; margin: 8px auto 0; padding: 6px 12px; border: none; border-radius: var(--border-radius-pill, 9999px); background: var(--color-background-dark); color: var(--color-text-maxcontrast); cursor: pointer; }
 .timeline__load-older:disabled { opacity: 0.6; cursor: default; }
 </style>

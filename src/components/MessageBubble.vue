@@ -5,6 +5,7 @@ import NcIconSvgWrapper from '@nextcloud/vue/components/NcIconSvgWrapper'
 import NcRichText from '@nextcloud/vue/components/NcRichText'
 import { FilePickerClosed, getFilePickerBuilder, showError, showSuccess } from '@nextcloud/dialogs'
 import { translate as t } from '@nextcloud/l10n'
+import { useFormatTime } from '@nextcloud/vue/composables/useFormatDateTime'
 import { computed, shallowRef } from 'vue'
 import { getErrorMessage, saveAttachment } from '../services/chatApi'
 import type { ChatMessage } from '../types/chat'
@@ -40,6 +41,8 @@ const formattedTime = computed(() => new Intl.DateTimeFormat(undefined, {
 	minute: '2-digit',
 }).format(props.message.timestamp))
 
+const formattedFullTimestamp = useFormatTime(() => props.message.timestamp, () => ({ format: { dateStyle: 'medium', timeStyle: 'short' } }))
+
 const replyIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V3l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-.8-5-3.8-10-11-11Z"/></svg>'
 const saveIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h12l4 4v14H5V3Zm2 2v14h12V8.1L16.9 6H7Zm2 0h6v5H9V5Zm1 8v4h4v-4h-4Z"/></svg>'
 const downloadIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3h2v10.2l3.6-3.6L18 11l-6 6-6-6 1.4-1.4 3.6 3.6V3ZM5 19h14v2H5v-2Z"/></svg>'
@@ -74,7 +77,7 @@ async function saveToNextcloud() {
 </script>
 
 <template>
-	<article class="message" :class="{ 'message--own': isOwn, 'message--grouped': grouped, 'message--focused': focused, 'message--mention': message.mentionsMe }" :data-message-id="message.id" tabindex="-1">
+	<article class="message" :class="{ 'message--own': isOwn, 'message--grouped': grouped, 'message--focused': focused, 'message--mention': message.mentionsMe }" :data-message-id="message.id" :title="formattedFullTimestamp" tabindex="-1">
 		<MessageReferencePreview
 			:message-id="message.id"
 			:text="message.body"

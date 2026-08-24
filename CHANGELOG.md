@@ -2,6 +2,18 @@
 
 All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
+## [0.6.0]
+
+### Changed
+
+- Date separators now follow the Talk style: a sticky pill header that stays visible
+  while scrolling, with relative labels like "Today, March 18" or "Yesterday, March 17"
+  that stay correct even when the app is open across midnight.
+- Sender grouping now matches the Matrix / Talk convention: consecutive messages from
+  the same sender on the same day within five minutes are grouped, hiding the avatar
+  and author header.
+- Grouped messages show their exact date and time in a tooltip on hover.
+
 ## [0.5.1]
 
 ### Fixed
