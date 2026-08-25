@@ -404,6 +404,23 @@ final class MatrixClientTest extends TestCase {
 		self::assertNull($this->matrix->resolveRoomAlias('secret-token', '#ctg_missing:chat.church.tools'));
 	}
 
+	public function testSurfacesMatrixErrorCodeAndMessage(): void {
+		$this->response->method('getStatusCode')->willReturn(404);
+		$this->response->method('getBody')->willReturn(json_encode([
+			'errcode' => 'M_NOT_FOUND',
+			'error' => 'Event not found.',
+		], JSON_THROW_ON_ERROR));
+		$this->httpClient->method('get')->willReturn($this->response);
+
+		try {
+			$this->matrix->sync('token', null);
+			self::fail('Expected an IntegrationException.');
+		} catch (IntegrationException $exception) {
+			self::assertSame('matrix_request_failed', $exception->getErrorCode());
+			self::assertSame('M_NOT_FOUND: Event not found.', $exception->getMessage());
+		}
+	}
+
 	private function configureResponse(int $status, string $contentType, string $body): void {
 		$this->response->method('getStatusCode')->willReturn($status);
 		$this->response->method('getHeader')->willReturnCallback(static fn (string $name): string => $name === 'Content-Type' ? $contentType : '');

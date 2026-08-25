@@ -521,7 +521,13 @@ final class MatrixClient {
 				throw new IntegrationException('matrix_rate_limited', 'Matrix rate limited the request.', 429, $retryAfter);
 			}
 			if ($status < 200 || $status >= 300) {
-				throw new IntegrationException('matrix_request_failed', 'Matrix could not complete the request.', 502);
+				$errcode = is_string($data['errcode'] ?? null) && $data['errcode'] !== ''
+					? (string)$data['errcode']
+					: 'HTTP ' . $status;
+				$error = is_string($data['error'] ?? null) && $data['error'] !== ''
+					? (string)$data['error']
+					: 'Matrix could not complete the request.';
+				throw new IntegrationException('matrix_request_failed', $errcode . ': ' . $error, 502);
 			}
 			return $data;
 		} catch (IntegrationException $e) {
