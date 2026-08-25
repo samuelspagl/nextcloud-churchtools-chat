@@ -8,8 +8,8 @@ use OCA\ChurchToolsChat\Exception\IntegrationException;
 
 /**
  * Diagnostic helper for the D5 spike: dump the ChurchTools chat metadata and the
- * joined Matrix rooms side by side so the exact CT chat -> room mapping can be
- * confirmed against a live tenant.
+ * Matrix rooms side by side so the exact CT chat -> room mapping can be confirmed
+ * against a live tenant.
  */
 final class ProbeService {
 	public function __construct(
@@ -22,10 +22,11 @@ final class ProbeService {
 	}
 
 	/**
-	 * Collect the raw /api/chat payload, the joined Matrix rooms with their relevant
-	 * state events, and the candidate aliases derived from the mapping hypothesis.
+	 * Collect the raw /api/chat payload, the joined/invited Matrix rooms with their
+	 * relevant state, and the candidate aliases (resolved via the room directory)
+	 * derived from the mapping hypothesis.
 	 *
-	 * @return array{tenantUrl:string,churchToolsChats:list<array<string,mixed>>,matrixRooms:list<array{roomId:string,state:array<string,mixed>}>,suggestedMappings:list<array{chat:array<string,mixed>,candidateAlias:string}>}
+	 * @return array{tenantUrl:string,churchToolsChats:list<array<string,mixed>>,matrixRooms:list<array{roomId:string,membership:string,state:array<string,mixed>,stateTypes:array<string,int>}>,suggestedMappings:list<array{chat:array<string,mixed>,candidateAlias:string,resolvedRoomId:string|null}>}
 	 */
 	public function collect(string $userId): array {
 		$tenantUrl = $this->appConfig->requireTenantUrl();
@@ -45,42 +46,63 @@ final class ProbeService {
 
 		$suggestedMappings = [];
 		foreach ($this->churchTools->getChats($tenantUrl, $ctToken) as $chat) {
+			$alias = $this->roomMapper->chatRoomAlias($chat['prefix'], $chat['guid'], $server);
 			$suggestedMappings[] = [
 				'chat' => $chat,
-				'candidateAlias' => $this->roomMapper->chatRoomAlias($chat['prefix'], $chat['guid'], $server),
+				'candidateAlias' => $alias,
+				'resolvedRoomId' => $this->matrix->resolveRoomAlias($matrixToken, $alias),
 			];
 		}
 
 		return [
 			'tenantUrl' => $tenantUrl,
 			'churchToolsChats' => $chats,
-			'matrixRooms' => $this->extractRooms($sync),
+			'matrixRooms' => $this->extractRooms($sync, $matrixToken),
 			'suggestedMappings' => $suggestedMappings,
 		];
 	}
 
-	/** @param array<string,mixed> $sync @return list<array{roomId:string,state:array<string,mixed>}> */
-	private function extractRooms(array $sync): array {
-		$joined = $sync['rooms']['join'] ?? [];
+	/** @param array<string,mixed> $sync @return list<array{roomId:string,membership:string,state:array<string,mixed>,stateTypes:array<string,int>}> */
+	private function extractRooms(array $sync, string $matrixToken): array {
 		$rooms = [];
-		foreach ($joined as $roomId => $room) {
-			if (!is_string($roomId) || !is_array($room)) {
-				continue;
-			}
-			$events = is_array($room['state']['events'] ?? null) ? $room['state']['events'] : [];
-			$state = [];
-			foreach ($events as $event) {
-				if (!is_array($event)) {
+		$joined = $sync['rooms']['join'] ?? [];
+		if (is_array($joined)) {
+			foreach ($joined as $roomId => $_room) {
+				if (!is_string($roomId)) {
 					continue;
 				}
-				$type = (string)($event['type'] ?? '');
-				if (in_array($type, ['m.room.canonical_alias', 'm.room.name', 'm.room.topic', 'm.room.create', 'm.room.join_rules'], true)
-					|| str_starts_with($type, 'ch.')) {
-					$state[$type] = $event['content'] ?? null;
-				}
+				$events = $this->matrix->roomState($matrixToken, $roomId);
+				$rooms[] = ['roomId' => $roomId, 'membership' => 'join', ...$this->extractState($events)];
 			}
-			$rooms[] = ['roomId' => $roomId, 'state' => $state];
+		}
+		$invited = $sync['rooms']['invite'] ?? [];
+		if (is_array($invited)) {
+			foreach ($invited as $roomId => $room) {
+				if (!is_string($roomId) || !is_array($room)) {
+					continue;
+				}
+				$events = is_array($room['invite_state']['events'] ?? null) ? $room['invite_state']['events'] : [];
+				$rooms[] = ['roomId' => $roomId, 'membership' => 'invite', ...$this->extractState($events)];
+			}
 		}
 		return $rooms;
+	}
+
+	/** @param list<array<string,mixed>> $events @return array{state:array<string,mixed>,stateTypes:array<string,int>} */
+	private function extractState(array $events): array {
+		$state = [];
+		$types = [];
+		foreach ($events as $event) {
+			if (!is_array($event)) {
+				continue;
+			}
+			$type = (string)($event['type'] ?? '');
+			$types[$type] = ($types[$type] ?? 0) + 1;
+			if (in_array($type, ['m.room.canonical_alias', 'm.room.name', 'm.room.topic', 'm.room.create', 'm.room.join_rules'], true)
+				|| str_starts_with($type, 'ch.')) {
+				$state[$type] = $event['content'] ?? null;
+			}
+		}
+		return ['state' => $state, 'stateTypes' => $types];
 	}
 }

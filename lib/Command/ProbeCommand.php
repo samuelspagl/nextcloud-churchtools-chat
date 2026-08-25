@@ -40,16 +40,22 @@ final class ProbeCommand extends Command {
 		$output->writeln('== ChurchTools /api/chat (raw) ==');
 		$output->writeln(json_encode($data['churchToolsChats'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 		$output->writeln('');
-		$output->writeln('== Matrix rooms (joined, relevant state) ==');
+		$output->writeln('== Matrix rooms (joined/invited, relevant state) ==');
 		foreach ($data['matrixRooms'] as $room) {
-			$output->writeln('--- ' . $room['roomId']);
+			$output->writeln('--- ' . $room['roomId'] . ' (' . $room['membership'] . ')');
+			$output->writeln('state types: ' . implode(', ', array_keys($room['stateTypes'])));
 			$output->writeln(json_encode($room['state'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 		}
 		$output->writeln('');
-		$output->writeln('== Suggested mapping (hypothesis, to confirm) ==');
+		$output->writeln('== Suggested mapping (hypothesis, resolved via directory) ==');
 		foreach ($data['suggestedMappings'] as $suggested) {
 			$chat = $suggested['chat'];
-			$output->writeln($chat['prefix'] . ' ' . $chat['guid'] . ' ' . ($chat['roomname'] ?? '') . ' -> ' . $suggested['candidateAlias']);
+			$resolved = $suggested['resolvedRoomId'] ?? null;
+			$output->writeln(
+				$chat['prefix'] . ' ' . $chat['guid'] . ' ' . ($chat['roomname'] ?? '')
+				. ' -> ' . $suggested['candidateAlias']
+				. ($resolved !== null ? '  [RESOLVED: ' . $resolved . ']' : '  [alias not found]'),
+			);
 		}
 		return Command::SUCCESS;
 	}

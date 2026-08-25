@@ -381,6 +381,29 @@ final class MatrixClientTest extends TestCase {
 		$this->matrix->sendTyping('secret-token', '!room:chat.church.tools', '@me:chat.church.tools', false);
 	}
 
+	public function testResolvesRoomAliasFromDirectory(): void {
+		$this->response->method('getStatusCode')->willReturn(200);
+		$this->response->method('getBody')->willReturn(json_encode(['room_id' => '!room:chat.church.tools'], JSON_THROW_ON_ERROR));
+		$this->httpClient
+			->expects(self::once())
+			->method('get')
+			->with(
+				'https://chat.church.tools/_matrix/client/v3/directory/room/%23ctg_guid%3Achat.church.tools',
+				self::callback(static fn (array $options): bool => ($options['headers']['Authorization'] ?? '') === 'Bearer secret-token'),
+			)
+			->willReturn($this->response);
+
+		self::assertSame('!room:chat.church.tools', $this->matrix->resolveRoomAlias('secret-token', '#ctg_guid:chat.church.tools'));
+	}
+
+	public function testResolveRoomAliasReturnsNullWhenAliasDoesNotExist(): void {
+		$this->response->method('getStatusCode')->willReturn(404);
+		$this->response->method('getBody')->willReturn('{"errcode":"M_NOT_FOUND"}');
+		$this->httpClient->method('get')->willReturn($this->response);
+
+		self::assertNull($this->matrix->resolveRoomAlias('secret-token', '#ctg_missing:chat.church.tools'));
+	}
+
 	private function configureResponse(int $status, string $contentType, string $body): void {
 		$this->response->method('getStatusCode')->willReturn($status);
 		$this->response->method('getHeader')->willReturnCallback(static fn (string $name): string => $name === 'Content-Type' ? $contentType : '');

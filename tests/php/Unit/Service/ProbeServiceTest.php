@@ -21,7 +21,7 @@ use OCP\Security\ICrypto;
 use PHPUnit\Framework\TestCase;
 
 final class ProbeServiceTest extends TestCase {
-	public function testCollectReturnsChatsRoomsAndSuggestedMappings(): void {
+	public function testCollectReturnsChatsRoomsAndResolvedSuggestedMappings(): void {
 		$probe = $this->createProbe();
 
 		$data = $probe->collect('admin');
@@ -36,11 +36,20 @@ final class ProbeServiceTest extends TestCase {
 			'status' => 'STARTED',
 		]], $data['churchToolsChats']);
 		self::assertSame(
-			[['roomId' => '!room:test', 'state' => ['m.room.canonical_alias' => ['alias' => '#ctg_guid:chat.church.tools']]]],
+			[
+				['roomId' => '!room:test', 'membership' => 'join', 'state' => [
+					'm.room.create' => ['creator' => '@ct_me:chat.church.tools'],
+					'm.room.canonical_alias' => ['alias' => '#ctg_guid:chat.church.tools'],
+				], 'stateTypes' => ['m.room.create' => 1, 'm.room.canonical_alias' => 1, 'm.room.member' => 1]],
+				['roomId' => '!invite:test', 'membership' => 'invite', 'state' => [
+					'm.room.name' => ['name' => 'Invite'],
+				], 'stateTypes' => ['m.room.name' => 1]],
+			],
 			$data['matrixRooms'],
 		);
 		self::assertCount(1, $data['suggestedMappings']);
 		self::assertSame('#ctg_guid:chat.church.tools', $data['suggestedMappings'][0]['candidateAlias']);
+		self::assertSame('!room:test', $data['suggestedMappings'][0]['resolvedRoomId']);
 	}
 
 	public function testCollectThrowsWhenUserIsNotConnected(): void {
@@ -104,20 +113,42 @@ final class ProbeServiceTest extends TestCase {
 		$syncResponse = $this->createMock(IResponse::class);
 		$syncResponse->method('getStatusCode')->willReturn(200);
 		$syncResponse->method('getBody')->willReturn(json_encode([
-			'rooms' => ['join' => ['!room:test' => ['state' => ['events' => [
-				['type' => 'm.room.canonical_alias', 'content' => ['alias' => '#ctg_guid:chat.church.tools']],
-				['type' => 'm.room.member', 'content' => []],
-			]]]]],
+			'rooms' => [
+				'join' => ['!room:test' => []],
+				'invite' => ['!invite:test' => ['invite_state' => ['events' => [
+					['type' => 'm.room.name', 'content' => ['name' => 'Invite']],
+				]]]],
+			],
+		], JSON_THROW_ON_ERROR));
+
+		$stateResponse = $this->createMock(IResponse::class);
+		$stateResponse->method('getStatusCode')->willReturn(200);
+		$stateResponse->method('getBody')->willReturn(json_encode([
+			['type' => 'm.room.create', 'content' => ['creator' => '@ct_me:chat.church.tools']],
+			['type' => 'm.room.canonical_alias', 'content' => ['alias' => '#ctg_guid:chat.church.tools']],
+			['type' => 'm.room.member', 'content' => []],
+		], JSON_THROW_ON_ERROR));
+
+		$directoryResponse = $this->createMock(IResponse::class);
+		$directoryResponse->method('getStatusCode')->willReturn(200);
+		$directoryResponse->method('getBody')->willReturn(json_encode([
+			'room_id' => '!room:test',
 		], JSON_THROW_ON_ERROR));
 
 		$httpClient = $this->createMock(IClient::class);
 		$httpClient->method('get')->willReturnCallback(
-			static function (string $url, array $options) use ($chatResponse, $syncResponse): IResponse {
+			static function (string $url, array $options) use ($chatResponse, $syncResponse, $stateResponse, $directoryResponse): IResponse {
 				if (str_contains($url, '/api/chat')) {
 					self::assertSame('Login ct-token', $options['headers']['Authorization'] ?? '');
 					return $chatResponse;
 				}
 				self::assertSame('Bearer mx-token', $options['headers']['Authorization'] ?? '');
+				if (str_contains($url, '/directory/room/')) {
+					return $directoryResponse;
+				}
+				if (str_contains($url, '/state')) {
+					return $stateResponse;
+				}
 				return $syncResponse;
 			},
 		);

@@ -454,6 +454,20 @@ final class MatrixClient {
 		);
 	}
 
+	/**
+	 * Resolve a room alias to a room id via the room directory, or null when the
+	 * alias does not exist on the homeserver.
+	 */
+	public function resolveRoomAlias(string $accessToken, string $alias): ?string {
+		try {
+			$result = $this->request('GET', '/_matrix/client/v3/directory/room/' . rawurlencode($alias), $accessToken);
+			$roomId = $result['room_id'] ?? null;
+			return is_string($roomId) && $roomId !== '' ? $roomId : null;
+		} catch (IntegrationException) {
+			return null;
+		}
+	}
+
 	/** @return array<string,mixed> */
 	public function redact(string $accessToken, string $roomId, string $eventId, string $transactionId): array {
 		return $this->request(
