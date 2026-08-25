@@ -10,6 +10,8 @@ use OCA\ChurchToolsChat\Service\MatrixClient;
 use OCA\ChurchToolsChat\Service\SecretService;
 use OCA\ChurchToolsChat\Service\UserContext;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\Response;
@@ -35,10 +37,8 @@ final class MediaController extends Controller {
 		parent::__construct(Application::APP_ID, $request);
 	}
 
-	/**
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
-	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function thumbnail(string $mxc): Response {
 		try {
 			$media = $this->matrix->imageThumbnail($this->token(), $mxc);
@@ -48,10 +48,8 @@ final class MediaController extends Controller {
 		}
 	}
 
-	/**
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
-	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function download(string $mxc, string $filename = 'attachment'): Response {
 		try {
 			$media = $this->matrix->media($this->token(), $mxc);
@@ -65,10 +63,8 @@ final class MediaController extends Controller {
 		}
 	}
 
-	/**
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
-	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function view(string $mxc): Response {
 		try {
 			$media = $this->matrix->media($this->token(), $mxc);
@@ -81,10 +77,8 @@ final class MediaController extends Controller {
 		}
 	}
 
-	/**
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
-	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function save(string $mxc, string $directory, string $filename = 'attachment'): JSONResponse {
 		try {
 			$userId = $this->userContext->getUserId();

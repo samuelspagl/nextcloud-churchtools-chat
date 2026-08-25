@@ -2,6 +2,13 @@
 
 All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
+## [0.6.3]
+
+### Fixed
+
+- Allow logged-in non-admin users to connect their own ChurchTools and CT Chat
+  accounts and use all personal chat routes as intended.
+
 ## [0.6.2]
 
 ### Added
