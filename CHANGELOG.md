@@ -6,6 +6,9 @@ All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
 ### Added
 
+- Emoji picker in the composer: a smiley button between the "+" menu and the text
+  editor opens the Nextcloud emoji picker and inserts the selected emoji at the
+  cursor position.
 - Typing indicators: other participants' typing state is shown in the conversation
   list and as an animated indicator in the chat history, and the composer publishes
   the local typing state to Matrix while writing.

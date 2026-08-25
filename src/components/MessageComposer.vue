@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import NcButton from '@nextcloud/vue/components/NcButton'
+import NcEmojiPicker from '@nextcloud/vue/components/NcEmojiPicker'
 import NcIconSvgWrapper from '@nextcloud/vue/components/NcIconSvgWrapper'
 import NcRichContenteditable from '@nextcloud/vue/components/NcRichContenteditable'
 import { translate as t } from '@nextcloud/l10n'
@@ -14,6 +15,7 @@ const draft = shallowRef('')
 const editor = useTemplateRef<InstanceType<typeof NcRichContenteditable>>('editor')
 const canSend = computed(() => !props.disabled && draft.value.trim() !== '')
 const sendIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 21 23 12 2 3v7l15 2-15 2v7Z"/></svg>'
+const smileyIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-3.5-9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm7 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM12 17.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5Z"/></svg>'
 
 const TYPING_HEARTBEAT_MS = 20_000
 let lastHasContent = false
@@ -66,6 +68,17 @@ function clearTyping() {
 function openSmartPicker() {
 	editor.value?.showTribute('/')
 }
+
+function insertEmoji(emoji: string) {
+	editor.value?.focus?.()
+	let inserted = false
+	try {
+		inserted = document.execCommand('insertText', false, emoji)
+	} catch {
+		// execCommand is not available everywhere (e.g. tests).
+	}
+	if (!inserted) draft.value += emoji
+}
 </script>
 
 <template>
@@ -77,6 +90,18 @@ function openSmartPicker() {
 			</div>
 			<div class="composer__controls">
 				<ComposerActionsMenu :disabled="disabled" @open-smart-picker="openSmartPicker" />
+				<NcEmojiPicker :close-on-select="true" @select="insertEmoji">
+					<NcButton
+						variant="tertiary"
+						:disabled="disabled"
+						:aria-label="t('churchtools_chat', 'Insert emoji')"
+						:title="t('churchtools_chat', 'Insert emoji')"
+						@mousedown.prevent>
+						<template #icon>
+							<NcIconSvgWrapper :svg="smileyIcon" :size="24" />
+						</template>
+					</NcButton>
+				</NcEmojiPicker>
 				<NcRichContenteditable
 					ref="editor"
 					v-model="draft"
