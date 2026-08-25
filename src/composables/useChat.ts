@@ -11,6 +11,7 @@ import {
 	getStatus,
 	reactToMessage,
 	deleteMessage as deleteMessageRequest,
+	editMessage as editMessageRequest,
 	searchConversations as searchConversationsRequest,
 	searchPersons as searchPersonsRequest,
 	searchRoomMessages as searchRoomMessagesRequest,
@@ -244,6 +245,25 @@ export function useChat() {
 					...room,
 					events: room.events.map((event) => event.id === message.id
 						? { ...event, redacted: true, body: '', attachment: undefined, reactions: undefined }
+						: event),
+				}
+				: room)
+		} catch (error) {
+			showError(getErrorMessage(error))
+		}
+	}
+
+	async function editMessage(message: ChatMessage, body: string) {
+		const roomId = activeRoomId.value
+		const trimmed = body.trim()
+		if (!roomId || message.id.startsWith('nc-') || trimmed === '') return
+		try {
+			await editMessageRequest(roomId, message.id, trimmed, transactionId())
+			rooms.value = rooms.value.map((room) => room.id === roomId
+				? {
+					...room,
+					events: room.events.map((event) => event.id === message.id
+						? { ...event, body: trimmed, edited: true }
 						: event),
 				}
 				: room)
@@ -600,6 +620,7 @@ export function useChat() {
 		react,
 		unreact,
 		deleteMessage,
+		editMessage,
 		toggleDetails,
 		closeDetails,
 		loadRoomDetails,

@@ -8,10 +8,19 @@ import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vu
 import type { ChatMessage } from '../types/chat'
 import ComposerActionsMenu from './ComposerActionsMenu.vue'
 
-const props = defineProps<{ disabled: boolean; replyTo?: ChatMessage | null }>()
-const emit = defineEmits<{ send: [body: string]; cancelReply: []; typing: [typing: boolean] }>()
+const props = defineProps<{ disabled: boolean; replyTo?: ChatMessage | null; editingMessage?: ChatMessage | null }>()
+const emit = defineEmits<{ send: [body: string]; cancelReply: []; typing: [typing: boolean]; edit: [message: ChatMessage, body: string]; cancelEdit: [] }>()
 
 const draft = shallowRef('')
+
+watch(() => props.editingMessage, (message) => {
+	if (message) draft.value = message.body
+}, { immediate: true })
+
+function cancelEdit() {
+	draft.value = ''
+	emit('cancelEdit')
+}
 const editor = useTemplateRef<InstanceType<typeof NcRichContenteditable>>('editor')
 const canSend = computed(() => !props.disabled && draft.value.trim() !== '')
 const sendIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 21 23 12 2 3v7l15 2-15 2v7Z"/></svg>'
@@ -56,7 +65,11 @@ function submit() {
 	const body = draft.value.trim()
 	if (!canSend.value) return
 	clearTyping()
-	emit('send', body)
+	if (props.editingMessage) {
+		emit('edit', props.editingMessage, body)
+	} else {
+		emit('send', body)
+	}
 	draft.value = ''
 }
 
@@ -118,7 +131,11 @@ function insertEmoji(emoji: string) {
 <template>
 	<form class="composer" @submit.prevent="submit">
 		<div class="composer__inner">
-			<div v-if="replyTo" class="composer__reply">
+			<div v-if="editingMessage" class="composer__reply">
+				<span>{{ t('churchtools_chat', 'Editing message') }}</span>
+				<NcButton type="button" variant="tertiary" @click="cancelEdit">{{ t('churchtools_chat', 'Cancel') }}</NcButton>
+			</div>
+			<div v-else-if="replyTo" class="composer__reply">
 				<span>{{ t('churchtools_chat', 'Replying to') }} {{ replyTo.senderName || replyTo.sender }}: {{ replyTo.body }}</span>
 				<NcButton type="button" variant="tertiary" @click="emit('cancelReply')">{{ t('churchtools_chat', 'Cancel') }}</NcButton>
 			</div>

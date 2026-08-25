@@ -67,9 +67,9 @@ const NcActionButtonStub = defineComponent({
 	template: '<button type="button" @click="$emit(\'click\')"><slot name="icon" /><slot /></button>',
 })
 
-function mountComposer(disabled = false) {
+function mountComposer(disabled = false, extraProps: Record<string, unknown> = {}) {
 	return mount(MessageComposer, {
-		props: { disabled },
+		props: { disabled, ...extraProps },
 		global: {
 			stubs: {
 				NcActionButton: NcActionButtonStub,
@@ -149,5 +149,30 @@ describe('MessageComposer', () => {
 		await wrapper.findComponent(NcEmojiPickerStub).vm.$emit('select', '👍')
 
 		expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('👍')
+	})
+
+	it('prefills the draft from the message being edited and emits edit instead of send', async () => {
+		const editingMessage = { id: '$m', sender: '@me:test', body: 'Original text', timestamp: 1 }
+		const wrapper = mountComposer(false, { editingMessage })
+
+		expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('Original text')
+
+		await wrapper.get('textarea').setValue('Updated text')
+		await wrapper.get('form').trigger('submit')
+
+		expect(wrapper.emitted('edit')).toEqual([[editingMessage, 'Updated text']])
+		expect(wrapper.emitted('send')).toBeUndefined()
+	})
+
+	it('clears the draft and emits cancelEdit when editing is cancelled', async () => {
+		const editingMessage = { id: '$m', sender: '@me:test', body: 'Original text', timestamp: 1 }
+		const wrapper = mountComposer(false, { editingMessage })
+
+		const cancelButton = wrapper.findAll('button').find((button) => button.text() === 'Cancel')
+		expect(cancelButton).toBeDefined()
+		await cancelButton!.trigger('click')
+
+		expect(wrapper.emitted('cancelEdit')).toHaveLength(1)
+		expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('')
 	})
 })

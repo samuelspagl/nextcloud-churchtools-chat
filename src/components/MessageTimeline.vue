@@ -63,6 +63,7 @@ const emit = defineEmits<{
 	react: [message: ChatMessage, emoji: string]
 	unreact: [message: ChatMessage, emoji: string]
 	delete: [message: ChatMessage]
+	edit: [message: ChatMessage]
 	jump: [message: ChatMessage]
 	loadOlder: []
 }>()
@@ -162,6 +163,7 @@ onBeforeUnmount(() => {
 						@react="(message, emoji) => emit('react', message, emoji)"
 						@unreact="(message, emoji) => emit('unreact', message, emoji)"
 						@delete="emit('delete', $event)"
+						@edit="emit('edit', $event)"
 						@jump="jumpToReply(message)" />
 				</template>
 			</template>
