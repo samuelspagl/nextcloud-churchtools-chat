@@ -69,15 +69,49 @@ function openSmartPicker() {
 	editor.value?.showTribute('/')
 }
 
-function insertEmoji(emoji: string) {
-	editor.value?.focus?.()
-	let inserted = false
-	try {
-		inserted = document.execCommand('insertText', false, emoji)
-	} catch {
-		// execCommand is not available everywhere (e.g. tests).
+let savedRange: Range | null = null
+
+function editorElement(): HTMLElement | null {
+	const el = editor.value?.$el as HTMLElement | undefined
+	return el?.querySelector<HTMLElement>('[contenteditable]') ?? null
+}
+
+function onEmojiTriggerMousedown(event: MouseEvent) {
+	const editable = editorElement()
+	const selection = window.getSelection()
+	if (editable && selection && selection.rangeCount > 0) {
+		const range = selection.getRangeAt(0)
+		if (editable.contains(range.commonAncestorContainer)) {
+			savedRange = range.cloneRange()
+		}
 	}
-	if (!inserted) draft.value += emoji
+	// Keep the editor focused so its selection survives opening the picker.
+	event.preventDefault()
+}
+
+function insertEmoji(emoji: string) {
+	const editable = editorElement()
+	if (editable && savedRange) {
+		editable.focus()
+		const selection = window.getSelection()
+		if (selection) {
+			selection.removeAllRanges()
+			selection.addRange(savedRange)
+		}
+		savedRange = null
+		let inserted = false
+		try {
+			inserted = document.execCommand('insertText', false, emoji)
+		} catch {
+			// execCommand is not available everywhere (e.g. tests).
+		}
+		if (inserted) {
+			// The picker refocuses its trigger on close; keep the editor focused for typing.
+			window.setTimeout(() => editorElement()?.focus(), 0)
+			return
+		}
+	}
+	draft.value += emoji
 }
 </script>
 
@@ -96,7 +130,7 @@ function insertEmoji(emoji: string) {
 						:disabled="disabled"
 						:aria-label="t('churchtools_chat', 'Insert emoji')"
 						:title="t('churchtools_chat', 'Insert emoji')"
-						@mousedown.prevent>
+						@mousedown="onEmojiTriggerMousedown">
 						<template #icon>
 							<NcIconSvgWrapper :svg="smileyIcon" :size="24" />
 						</template>
