@@ -10,6 +10,7 @@ use OCA\ChurchToolsChat\Service\ChurchToolsClient;
 use OCA\ChurchToolsChat\Service\MatrixClient;
 use OCA\ChurchToolsChat\Service\SecretService;
 use OCA\ChurchToolsChat\Service\UserContext;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 use Psr\Log\LoggerInterface;
@@ -27,7 +28,7 @@ final class SettingsController extends ApiController {
 		parent::__construct($request, $logger);
 	}
 
-	/** @NoAdminRequired */
+	#[NoAdminRequired]
 	public function get(): JSONResponse {
 		return $this->respond(function (): array {
 			$userId = $this->userContext->getUserId();
@@ -39,7 +40,7 @@ final class SettingsController extends ApiController {
 		});
 	}
 
-	/** @NoAdminRequired */
+	#[NoAdminRequired]
 	public function save(string $token, ?string $matrixPassword = null): JSONResponse {
 		return $this->respond(function () use ($token, $matrixPassword): array {
 			$userId = $this->userContext->getUserId();
@@ -90,7 +91,7 @@ final class SettingsController extends ApiController {
 		});
 	}
 
-	/** @NoAdminRequired */
+	#[NoAdminRequired]
 	public function destroy(): JSONResponse {
 		return $this->respond(function (): array {
 			$this->secrets->clearAll($this->userContext->getUserId());

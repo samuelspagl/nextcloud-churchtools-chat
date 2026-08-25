@@ -10,6 +10,8 @@ use OCA\ChurchToolsChat\Service\MatrixClient;
 use OCA\ChurchToolsChat\Service\SecretService;
 use OCA\ChurchToolsChat\Service\UserContext;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\Response;
 use OCP\IRequest;
@@ -29,10 +31,8 @@ final class AvatarController extends Controller {
 		parent::__construct(Application::APP_ID, $request);
 	}
 
-	/**
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
-	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function thumbnail(string $mxc): Response {
 		try {
 			$userId = $this->userContext->getUserId();
