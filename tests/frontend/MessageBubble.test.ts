@@ -4,6 +4,7 @@ import { shallowMount } from '@vue/test-utils'
 import { defineComponent } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import MessageBubble from '../../src/components/MessageBubble.vue'
+import ReplyPreview from '../../src/components/ReplyPreview.vue'
 
 const mocks = vi.hoisted(() => {
 	const pick = vi.fn()
@@ -135,5 +136,47 @@ describe('MessageBubble', () => {
 		await actionButtons[1].trigger('click')
 		expect(wrapper.emitted('reply')).toHaveLength(1)
 		expect(wrapper.emitted('react')?.[0]?.[1]).toBe('👍')
+	})
+
+	it('renders a reply preview for reply messages and forwards jumps', async () => {
+		const wrapper = shallowMount(MessageBubble, {
+			props: {
+				currentUserId: '@me:example.test',
+				message: {
+					id: '$reply',
+					sender: '@me:example.test',
+					body: 'Answer',
+					timestamp: 1,
+					relatesTo: { 'm.in_reply_to': { event_id: '$original' } },
+				},
+				replyToMessage: {
+					id: '$original',
+					sender: '@other:example.test',
+					senderName: 'Other',
+					body: 'Question',
+					timestamp: 1,
+				},
+				canJumpReply: true,
+			},
+			global: {
+				stubs: {
+					MessageReferencePreview: MessageReferencePreviewStub,
+					MessageReferencePreviewControls: true,
+				},
+			},
+		})
+
+		const preview = wrapper.findComponent(ReplyPreview)
+		expect(preview.exists()).toBe(true)
+		expect(preview.props('canJump')).toBe(true)
+
+		await preview.vm.$emit('jump')
+		expect(wrapper.emitted('jump')).toHaveLength(1)
+	})
+
+	it('does not render a reply preview without a reply relation', () => {
+		const wrapper = mountMessageBubble()
+
+		expect(wrapper.findComponent(ReplyPreview).exists()).toBe(false)
 	})
 })

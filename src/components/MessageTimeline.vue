@@ -4,6 +4,7 @@ import { translate as t } from '@nextcloud/l10n'
 import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, watch, useTemplateRef } from 'vue'
 import { useDayLabel } from '../composables/useDayLabel'
 import type { ChatMessage } from '../types/chat'
+import { getReplyTargetId } from '../utils/relations'
 import { buildTimeline, type TimelineItem } from '../utils/timeline'
 import MessageBubble from './MessageBubble.vue'
 
@@ -13,17 +14,45 @@ const props = defineProps<{
 	loading: boolean
 	hasMore: boolean
 	focusMessageId: string | null
+	replyTargets: Record<string, ChatMessage>
 }>()
 
 const { dayLabel } = useDayLabel()
 
 const decoratedMessages = computed<TimelineItem[]>(() => buildTimeline(props.messages))
 
+const replyTargetMap = computed(() => {
+	const map = new Map<string, ChatMessage>()
+	for (const message of props.messages) {
+		map.set(message.id, message)
+	}
+	for (const [eventId, message] of Object.entries(props.replyTargets)) {
+		map.set(eventId, message)
+	}
+	return map
+})
+
+function replyContext(message: ChatMessage): { message: ChatMessage | null; canJump: boolean } {
+	const targetId = getReplyTargetId(message)
+	if (targetId === null) return { message: null, canJump: false }
+	return {
+		message: replyTargetMap.value.get(targetId) ?? null,
+		canJump: props.messages.some((item) => item.id === targetId),
+	}
+}
+
+function jumpToReply(message: ChatMessage) {
+	const targetId = getReplyTargetId(message)
+	const target = targetId !== null ? replyTargetMap.value.get(targetId) : undefined
+	if (target) emit('jump', target)
+}
+
 const emit = defineEmits<{
 	retry: [message: ChatMessage]
 	reply: [message: ChatMessage]
 	react: [message: ChatMessage, emoji: string]
 	delete: [message: ChatMessage]
+	jump: [message: ChatMessage]
 	loadOlder: []
 }>()
 const timeline = useTemplateRef<HTMLElement>('timeline')
@@ -113,10 +142,13 @@ onBeforeUnmount(() => {
 						:current-user-id="currentUserId"
 						:grouped="message.grouped"
 						:focused="message.id === focusMessageId"
+						:reply-to-message="replyContext(message).message"
+						:can-jump-reply="replyContext(message).canJump"
 						@retry="emit('retry', $event)"
 						@reply="emit('reply', $event)"
 						@react="(message, emoji) => emit('react', message, emoji)"
-						@delete="emit('delete', $event)" />
+						@delete="emit('delete', $event)"
+						@jump="jumpToReply(message)" />
 				</template>
 			</template>
 		</div>

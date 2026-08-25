@@ -23,6 +23,7 @@ return [
 		['name' => 'chat#details', 'url' => '/api/rooms/{roomId}/details', 'verb' => 'GET'],
 		['name' => 'chat#searchMessages', 'url' => '/api/rooms/{roomId}/search', 'verb' => 'GET'],
 		['name' => 'chat#messages', 'url' => '/api/rooms/{roomId}/messages', 'verb' => 'GET'],
+		['name' => 'chat#message', 'url' => '/api/rooms/{roomId}/messages/{eventId}', 'verb' => 'GET'],
 		['name' => 'chat#send', 'url' => '/api/rooms/{roomId}/messages', 'verb' => 'POST'],
 		['name' => 'chat#react', 'url' => '/api/rooms/{roomId}/messages/{eventId}/reactions', 'verb' => 'POST'],
 		['name' => 'chat#edit', 'url' => '/api/rooms/{roomId}/messages/{eventId}', 'verb' => 'PUT'],

@@ -166,6 +166,15 @@ final class MatrixClient {
 		}
 	}
 
+	/** @return array<string,mixed> */
+	public function event(string $accessToken, string $roomId, string $eventId): array {
+		return $this->request(
+			'GET',
+			'/_matrix/client/v3/rooms/' . rawurlencode($roomId) . '/event/' . rawurlencode($eventId),
+			$accessToken,
+		);
+	}
+
 	/** @return array<string,list<string>> */
 	public function getDirectRooms(string $accessToken, string $currentUserId): array {
 		try {

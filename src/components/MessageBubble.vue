@@ -12,15 +12,19 @@ import type { ChatMessage } from '../types/chat'
 import { displayableAvatarUrl } from '../utils/avatar'
 import { attachmentDownloadUrl } from '../utils/attachments'
 import { messageSenderLabel } from '../utils/messages'
+import { getReplyTargetId } from '../utils/relations'
 import MessageReferencePreview from './MessageReferencePreview.vue'
 import MessageReferencePreviewControls from './MessageReferencePreviewControls.vue'
 import MessageAttachment from './MessageAttachment.vue'
+import ReplyPreview from './ReplyPreview.vue'
 
 const props = defineProps<{
 	message: ChatMessage
 	currentUserId: string
 	grouped?: boolean
 	focused?: boolean
+	replyToMessage?: ChatMessage | null
+	canJumpReply?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -28,12 +32,14 @@ const emit = defineEmits<{
 	reply: [message: ChatMessage]
 	react: [message: ChatMessage, emoji: string]
 	delete: [message: ChatMessage]
+	jump: []
 }>()
 
 const isDeleted = computed(() => props.message.redacted === true || props.message.body === '')
 const canDelete = computed(() => isOwn.value && props.message.status === 'sent' && !isDeleted.value)
 const isOwn = computed(() => props.message.sender === props.currentUserId)
 const senderLabel = computed(() => messageSenderLabel(props.message, props.currentUserId, t('churchtools_chat', 'You')))
+const hasReply = computed(() => getReplyTargetId(props.message) !== null)
 const savingAttachment = shallowRef(false)
 
 const formattedTime = computed(() => new Intl.DateTimeFormat(undefined, {
@@ -99,6 +105,12 @@ async function saveToNextcloud() {
 					</header>
 					<div class="message__bubble-line">
 						<div class="message__bubble" :class="{ 'message__bubble--attachment': message.attachment, 'message__bubble--deleted': isDeleted }">
+							<ReplyPreview
+								v-if="hasReply && !isDeleted"
+								:message="replyToMessage ?? null"
+								:current-user-id="currentUserId"
+								:can-jump="canJumpReply"
+								@jump="emit('jump')" />
 							<span v-if="isDeleted">{{ t('churchtools_chat', 'Message deleted') }}</span>
 							<MessageAttachment v-else-if="message.attachment" :attachment="message.attachment" :saving="savingAttachment" @save="saveToNextcloud" />
 							<NcRichText v-else :text="message.body" autolink use-markdown />

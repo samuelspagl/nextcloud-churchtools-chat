@@ -1,9 +1,10 @@
-import { computed, onBeforeUnmount, onMounted, readonly, ref, shallowRef } from 'vue'
+import { computed, onBeforeUnmount, onMounted, readonly, ref, shallowRef, watch } from 'vue'
 import { showError } from '@nextcloud/dialogs'
 import {
 	getErrorCode,
 	getErrorMessage,
 	getErrorValue,
+	getEvent,
 	getMessages,
 	getRoomDetails,
 	getRooms,
@@ -21,7 +22,7 @@ import {
 import type { ChatMessage, ChatRoom, ChatStatus, ConversationSearchResult, PersonSearchResult, RoomDetails } from '../types/chat'
 import { mergeRooms } from '../utils/rooms'
 import { backoffDelay } from '../utils/backoff'
-import { buildReplyRelation } from '../utils/relations'
+import { buildReplyRelation, getReplyTargetId } from '../utils/relations'
 
 function transactionId(): string {
 	return `nc-${crypto.randomUUID()}`
@@ -51,6 +52,8 @@ export function useChat() {
 	const focusedMessageId = shallowRef<string | null>(null)
 	const nextBatch = shallowRef<string | undefined>()
 	const sessionExpired = shallowRef(false)
+	const replyTargets = shallowRef<Record<string, ChatMessage>>({})
+	const pendingReplyTargets = new Set<string>()
 	let stopped = false
 	let personSearchSequence = 0
 	let conversationSearchSequence = 0
@@ -355,6 +358,36 @@ export function useChat() {
 		focusTimer = window.setTimeout(() => { focusedMessageId.value = null }, 2200)
 	}
 
+	async function fetchReplyTarget(roomId: string, eventId: string) {
+		if (pendingReplyTargets.has(eventId) || replyTargets.value[eventId]) return
+		pendingReplyTargets.add(eventId)
+		try {
+			const target = await getEvent(roomId, eventId)
+			replyTargets.value = { ...replyTargets.value, [eventId]: target }
+		} catch {
+			// Leave the reply target unresolved; the timeline renders a placeholder.
+		} finally {
+			pendingReplyTargets.delete(eventId)
+		}
+	}
+
+	watch(activeRoomId, () => {
+		replyTargets.value = {}
+		pendingReplyTargets.clear()
+	})
+
+	watch(messages, (list) => {
+		const roomId = activeRoomId.value
+		if (!roomId) return
+		const loadedIds = new Set(list.map((message) => message.id))
+		for (const message of list) {
+			const targetId = getReplyTargetId(message)
+			if (targetId !== null && !loadedIds.has(targetId) && !replyTargets.value[targetId]) {
+				void fetchReplyTarget(roomId, targetId)
+			}
+		}
+	}, { immediate: true })
+
 	async function startDirectChat(person: PersonSearchResult) {
 		startingPersonId.value = person.id
 		personSearchError.value = ''
@@ -505,6 +538,7 @@ export function useChat() {
 		searchingMessages: readonly(searchingMessages),
 		messageSearchError: readonly(messageSearchError),
 		focusedMessageId: readonly(focusedMessageId),
+		replyTargets: readonly(replyTargets),
 		selectRoom,
 		loadOlderMessages,
 		searchPersons,

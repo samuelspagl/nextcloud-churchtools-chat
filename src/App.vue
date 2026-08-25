@@ -38,6 +38,7 @@ const {
 	searchingMessages,
 	messageSearchError,
 	focusedMessageId,
+	replyTargets,
 	selectRoom,
 	searchPersons,
 	clearPersonSearch,
@@ -214,11 +215,13 @@ async function retryMessage(message: ChatMessage) {
 						:loading="loadingMessages"
 						:has-more="activeRoom?.hasMore ?? false"
 						:focus-message-id="focusedMessageId"
+						:reply-targets="replyTargets"
 						@load-older="loadOlderMessages(activeRoomId ?? '')"
 						@retry="retryMessage"
 						@reply="replyTarget = $event"
 						@react="reactToMessage"
-						@delete="deleteMessage" />
+						@delete="deleteMessage"
+						@jump="focusMessage" />
 					<MessageComposer
 						:disabled="!status?.capabilities.send || activeRoom.encrypted"
 						:reply-to="replyTarget"

@@ -239,6 +239,31 @@ final class MatrixClientTest extends TestCase {
 		]], $this->matrix->searchMessages('secret-token', 'meeting notes'));
 	}
 
+	public function testFetchesASingleRoomEvent(): void {
+		$this->response->method('getStatusCode')->willReturn(200);
+		$this->response->method('getBody')->willReturn(json_encode([
+			'type' => 'm.room.message',
+			'event_id' => '$target:chat.church.tools',
+			'content' => ['msgtype' => 'm.text', 'body' => 'original'],
+		], JSON_THROW_ON_ERROR));
+		$this->httpClient
+			->expects(self::once())
+			->method('get')
+			->with(
+				'https://chat.church.tools/_matrix/client/v3/rooms/%21room%3Achat.church.tools/event/%24target%3Achat.church.tools',
+				self::callback(static function (array $options): bool {
+					self::assertSame('Bearer secret-token', $options['headers']['Authorization']);
+					return true;
+				}),
+			)
+			->willReturn($this->response);
+
+		$event = $this->matrix->event('secret-token', '!room:chat.church.tools', '$target:chat.church.tools');
+
+		self::assertSame('m.room.message', $event['type']);
+		self::assertSame('original', $event['content']['body']);
+	}
+
 	/** @dataProvider matrixFailureStatuses */
 	public function testMapsMatrixHttpFailures(int $status, string $errorCode, int $httpStatus): void {
 		$this->configureResponse($status, 'image/png', 'ignored');

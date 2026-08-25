@@ -204,6 +204,51 @@ final class MatrixRoomMapperTest extends TestCase {
 		self::assertSame(1234, $messages[0]['attachment']['size']);
 	}
 
+	public function testStripsRichReplyFallbackFromReplyBody(): void {
+		$messages = $this->mapper->events([[
+			'type' => 'm.room.message',
+			'event_id' => '$reply',
+			'sender' => '@ct_ben:chat.church.tools',
+			'origin_server_ts' => 200,
+			'content' => [
+				'msgtype' => 'm.text',
+				'body' => "> <@ct_anna:chat.church.tools> Original message text\n\nMy reply here",
+				'm.relates_to' => ['m.in_reply_to' => ['event_id' => '$original']],
+			],
+		]], []);
+
+		self::assertSame('My reply here', $messages[0]['body']);
+		self::assertSame(['m.in_reply_to' => ['event_id' => '$original']], $messages[0]['relatesTo']);
+	}
+
+	public function testStripsMultiLineRichReplyFallback(): void {
+		$messages = $this->mapper->events([[
+			'type' => 'm.room.message',
+			'event_id' => '$reply',
+			'sender' => '@ct_ben:chat.church.tools',
+			'origin_server_ts' => 200,
+			'content' => [
+				'msgtype' => 'm.text',
+				'body' => "> line one\n> line two\n> \n\nReply without quote prefix",
+				'm.relates_to' => ['m.in_reply_to' => ['event_id' => '$original']],
+			],
+		]], []);
+
+		self::assertSame('Reply without quote prefix', $messages[0]['body']);
+	}
+
+	public function testKeepsBlockquoteStyleBodyWhenNotAReply(): void {
+		$messages = $this->mapper->events([[
+			'type' => 'm.room.message',
+			'event_id' => '$quote',
+			'sender' => '@ct_anna:chat.church.tools',
+			'origin_server_ts' => 200,
+			'content' => ['msgtype' => 'm.text', 'body' => "> A real blockquote\n\nStill here"],
+		]], []);
+
+		self::assertSame("> A real blockquote\n\nStill here", $messages[0]['body']);
+	}
+
 	/** @return array<string,mixed> */
 	private function member(string $userId, string $displayName, ?string $avatarUrl = null): array {
 		$content = ['membership' => 'join', 'displayname' => $displayName];

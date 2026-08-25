@@ -174,12 +174,16 @@ final class MatrixRoomMapper {
 			if ($msgtype !== 'm.text' && $attachment === null) {
 				continue;
 			}
+			$body = (string)($replacements[$eventId] ?? $content['body'] ?? '');
+			if (isset($relation['m.in_reply_to']) && is_array($relation['m.in_reply_to'])) {
+				$body = $this->stripReplyFallback($body);
+			}
 			$normalized[] = [
 				'id' => $eventId,
 				'sender' => $sender,
 				'senderName' => $member['displayName'] ?? $this->fallbackUserName($sender),
 				'senderAvatarUrl' => $member['avatarUrl'] ?? null,
-				'body' => (string)($replacements[$eventId] ?? $content['body'] ?? ''),
+				'body' => $body,
 				'timestamp' => (int)($event['origin_server_ts'] ?? 0),
 				'edited' => isset($replacements[$eventId]),
 				'mentionsMe' => $mentionsMe,
@@ -298,5 +302,30 @@ final class MatrixRoomMapper {
 		$localpart = preg_replace('/^ct_/', '', $localpart) ?? $localpart;
 		$readable = trim(str_replace(['_', '-'], ' ', $localpart));
 		return $readable !== '' ? $readable : 'Unknown user';
+	}
+
+	/**
+	 * Strip the Matrix rich-reply fallback from a message body: the leading block of
+	 * "> " quoted lines (and a single blank separator line) that clients include when
+	 * sending an m.in_reply_to message. The remaining text is the actual reply.
+	 */
+	private function stripReplyFallback(string $body): string {
+		$lines = preg_split('/\R/', $body);
+		if ($lines === false || $lines === []) {
+			return $body;
+		}
+		$index = 0;
+		$stripped = 0;
+		while (isset($lines[$index]) && str_starts_with($lines[$index], '>')) {
+			$index++;
+			$stripped++;
+		}
+		if ($stripped === 0) {
+			return $body;
+		}
+		if (isset($lines[$index]) && trim($lines[$index]) === '') {
+			$index++;
+		}
+		return trim(implode("\n", array_slice($lines, $index)));
 	}
 }

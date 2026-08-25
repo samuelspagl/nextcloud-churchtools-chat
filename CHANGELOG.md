@@ -4,6 +4,13 @@ All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
 ## [0.6.0]
 
+### Added
+
+- Inline replies are now rendered with a quote preview above the message. The original
+  message is resolved from the loaded timeline or fetched on demand, and the quote can
+  jump back to the original message.
+- Matrix rich-reply fallback text (`> ` quoted lines) is stripped from reply bodies.
+
 ### Changed
 
 - Date separators now follow the Talk style: a sticky pill header that stays visible

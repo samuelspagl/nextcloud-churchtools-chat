@@ -48,6 +48,11 @@ final class ChatController extends ApiController {
 	}
 
 	/** @NoAdminRequired */
+	public function message(string $roomId, string $eventId): JSONResponse {
+		return $this->respond(fn (): array => $this->gateway->getMessage($this->userContext->getUserId(), $roomId, $eventId));
+	}
+
+	/** @NoAdminRequired */
 	public function searchMessages(string $roomId, string $query, int $limit = 20): JSONResponse {
 		return $this->respond(fn (): array => $this->gateway->searchMessages($this->userContext->getUserId(), $roomId, $query, $limit));
 	}

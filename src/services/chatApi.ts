@@ -1,6 +1,7 @@
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import type {
+	ChatMessage,
 	ChatStatus,
 	ConversationSearchResponse,
 	DirectChatResponse,
@@ -51,6 +52,13 @@ export async function getMessages(roomId: string, from?: string): Promise<Messag
 	const response = await axios.get<ApiEnvelope<MessagesResponse>>(
 		endpoint(`/api/rooms/${encodeURIComponent(roomId)}/messages`),
 		{ params: { from } },
+	)
+	return response.data.data
+}
+
+export async function getEvent(roomId: string, eventId: string): Promise<ChatMessage> {
+	const response = await axios.get<ApiEnvelope<ChatMessage>>(
+		endpoint(`/api/rooms/${encodeURIComponent(roomId)}/messages/${encodeURIComponent(eventId)}`),
 	)
 	return response.data.data
 }
