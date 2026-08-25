@@ -180,8 +180,10 @@ async function saveToNextcloud() {
 </template>
 
 <style scoped>
-.message { display: flex; width: 100%; min-width: 0; flex-direction: column; gap: 4px; }
+.message { --message-avatar-inset: 42px; display: flex; width: 100%; min-width: 0; flex-direction: column; gap: 4px; }
 .message--grouped { margin-block-start: -8px; }
+.message--grouped .message__content { padding-inline-start: var(--message-avatar-inset); }
+.message--own.message--grouped .message__content { padding-inline-start: 0; padding-inline-end: var(--message-avatar-inset); }
 .message--focused .message__bubble { box-shadow: 0 0 0 3px var(--color-primary-element-light); }
 .message--mention .message__bubble { box-shadow: inset 3px 0 0 var(--color-primary-element); }
 .message--own.message--mention .message__bubble { box-shadow: inset -3px 0 0 var(--color-primary-element-text); }
