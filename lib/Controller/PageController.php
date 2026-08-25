@@ -7,6 +7,8 @@ namespace OCA\ChurchToolsChat\Controller;
 use OCA\ChurchToolsChat\AppInfo\Application;
 use OCP\Collaboration\Reference\RenderReferenceEvent;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\EventDispatcher\IEventDispatcher;
 use OCP\IRequest;
@@ -20,10 +22,8 @@ final class PageController extends Controller {
 		parent::__construct(Application::APP_ID, $request);
 	}
 
-	/**
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
-	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function index(): TemplateResponse {
 		$this->eventDispatcher->dispatchTyped(new RenderReferenceEvent());
 		Util::addScript(Application::APP_ID, Application::APP_ID . '-main');
