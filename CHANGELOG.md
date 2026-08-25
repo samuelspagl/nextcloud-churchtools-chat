@@ -2,6 +2,12 @@
 
 All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
+## [0.6.1]
+
+### Added
+
+- Emoji picker in the composer.
+
 ## [0.6.0]
 
 ### Added
