@@ -48,6 +48,7 @@ const {
 	focusMessage,
 	startDirectChat,
 	send,
+	setTyping,
 	retry,
 	react,
 	deleteMessage,
@@ -216,6 +217,8 @@ async function retryMessage(message: ChatMessage) {
 						:has-more="activeRoom?.hasMore ?? false"
 						:focus-message-id="focusedMessageId"
 						:reply-targets="replyTargets"
+						:typing-users="activeRoom?.typingUsers ?? []"
+						:read-receipts="activeRoom?.kind === 'direct' ? activeRoom?.readReceipts : undefined"
 						@load-older="loadOlderMessages(activeRoomId ?? '')"
 						@retry="retryMessage"
 						@reply="replyTarget = $event"
@@ -225,6 +228,7 @@ async function retryMessage(message: ChatMessage) {
 					<MessageComposer
 						:disabled="!status?.capabilities.send || activeRoom.encrypted"
 						:reply-to="replyTarget"
+						@typing="setTyping"
 						@cancel-reply="replyTarget = null"
 						@send="sendMessage" />
 				</template>

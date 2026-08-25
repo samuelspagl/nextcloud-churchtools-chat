@@ -5,11 +5,12 @@ const mocks = vi.hoisted(() => ({
 	getMessages: vi.fn(),
 	getEvent: vi.fn(),
 	setFullyRead: vi.fn(),
+	setTyping: vi.fn(),
 }))
 
 vi.mock('../../src/services/chatApi', async (importActual) => {
 	const actual = await importActual<typeof import('../../src/services/chatApi')>()
-	return { ...actual, sendMessage: mocks.sendMessage, getMessages: mocks.getMessages, getEvent: mocks.getEvent, setFullyRead: mocks.setFullyRead }
+	return { ...actual, sendMessage: mocks.sendMessage, getMessages: mocks.getMessages, getEvent: mocks.getEvent, setFullyRead: mocks.setFullyRead, setTyping: mocks.setTyping }
 })
 
 import { useChat } from '../../src/composables/useChat'
@@ -84,5 +85,33 @@ describe('useChat send/retry', () => {
 			expect(mocks.getEvent).toHaveBeenCalledWith('!room:test', '$original')
 			expect(chat.replyTargets.value['$original']?.body).toBe('Original')
 		})
+	})
+
+	it('forwards typing state to the active room', async () => {
+		mocks.setTyping.mockResolvedValue(undefined)
+		const chat = useChat()
+		chat.rooms.value = [{
+			id: '!room:test',
+			name: 'r',
+			avatarUrl: null,
+			encrypted: false,
+			kind: 'direct',
+			memberCount: 1,
+			unreadCount: 0,
+			lastMessage: null,
+			events: [],
+		}]
+		await chat.selectRoom('!room:test')
+
+		await chat.setTyping(true)
+
+		expect(mocks.setTyping).toHaveBeenCalledWith('!room:test', true)
+	})
+
+	it('ignores typing requests without an active room', async () => {
+		const chat = useChat()
+		await chat.setTyping(true)
+
+		expect(mocks.setTyping).not.toHaveBeenCalled()
 	})
 })

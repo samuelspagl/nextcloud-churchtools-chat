@@ -296,6 +296,13 @@ final class ChatGateway {
 		}
 	}
 
+	public function setTyping(string $userId, string $roomId, bool $typing): void {
+		$this->assertRoomId($roomId);
+		$accessToken = $this->requireMatrixToken($userId);
+		$matrixUserId = $this->secrets->getMatrixUserId($userId);
+		$this->matrix->sendTyping($accessToken, $roomId, $matrixUserId, $typing);
+	}
+
 	public function redact(string $userId, string $roomId, string $eventId): void {
 		$this->assertRoomId($roomId);
 		$this->assertEventId($eventId);

@@ -341,6 +341,46 @@ final class MatrixClientTest extends TestCase {
 		self::assertSame('$edited:chat.church.tools', $result['event_id']);
 	}
 
+	public function testSendsTypingIndicatorWithTimeout(): void {
+		$this->response->method('getStatusCode')->willReturn(200);
+		$this->response->method('getBody')->willReturn('{}');
+		$this->httpClient
+			->expects(self::once())
+			->method('put')
+			->with(
+				'https://chat.church.tools/_matrix/client/v3/rooms/%21room%3Achat.church.tools/typing/%40me%3Achat.church.tools',
+				self::callback(static function (array $options): bool {
+					self::assertSame('Bearer secret-token', $options['headers']['Authorization']);
+					self::assertSame([
+						'typing' => true,
+						'timeout' => 30000,
+					], json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR));
+					return true;
+				}),
+			)
+			->willReturn($this->response);
+
+		$this->matrix->sendTyping('secret-token', '!room:chat.church.tools', '@me:chat.church.tools', true);
+	}
+
+	public function testClearsTypingIndicatorWithoutTimeout(): void {
+		$this->response->method('getStatusCode')->willReturn(200);
+		$this->response->method('getBody')->willReturn('{}');
+		$this->httpClient
+			->expects(self::once())
+			->method('put')
+			->with(
+				'https://chat.church.tools/_matrix/client/v3/rooms/%21room%3Achat.church.tools/typing/%40me%3Achat.church.tools',
+				self::callback(static function (array $options): bool {
+					self::assertSame(['typing' => false], json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR));
+					return true;
+				}),
+			)
+			->willReturn($this->response);
+
+		$this->matrix->sendTyping('secret-token', '!room:chat.church.tools', '@me:chat.church.tools', false);
+	}
+
 	private function configureResponse(int $status, string $contentType, string $body): void {
 		$this->response->method('getStatusCode')->willReturn($status);
 		$this->response->method('getHeader')->willReturnCallback(static fn (string $name): string => $name === 'Content-Type' ? $contentType : '');

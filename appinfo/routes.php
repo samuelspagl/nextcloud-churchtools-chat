@@ -29,6 +29,7 @@ return [
 		['name' => 'chat#edit', 'url' => '/api/rooms/{roomId}/messages/{eventId}', 'verb' => 'PUT'],
 		['name' => 'chat#redact', 'url' => '/api/rooms/{roomId}/messages/{eventId}/redact', 'verb' => 'POST'],
 		['name' => 'chat#setFullyRead', 'url' => '/api/rooms/{roomId}/read-marker', 'verb' => 'POST'],
+		['name' => 'chat#typing', 'url' => '/api/rooms/{roomId}/typing', 'verb' => 'POST'],
 		['name' => 'chat#sync', 'url' => '/api/sync', 'verb' => 'GET'],
 	],
 ];

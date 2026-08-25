@@ -204,4 +204,39 @@ describe('MessageBubble', () => {
 		expect(preview.props('fallbackText')).toBe('Question text')
 		expect(preview.props('canJump')).toBe(false)
 	})
+
+	it('shows a read check on own sent messages marked as read', () => {
+		const wrapper = shallowMount(MessageBubble, {
+			props: {
+				currentUserId: '@me:example.test',
+				message: { id: '$m', sender: '@me:example.test', body: 'hi', timestamp: 1, status: 'sent' },
+				readByOther: true,
+			},
+			global: {
+				stubs: {
+					MessageReferencePreview: MessageReferencePreviewStub,
+					MessageReferencePreviewControls: true,
+				},
+			},
+		})
+
+		expect(wrapper.find('.message__read').exists()).toBe(true)
+	})
+
+	it('does not show a read check when the message is not read by the other user', () => {
+		const wrapper = shallowMount(MessageBubble, {
+			props: {
+				currentUserId: '@me:example.test',
+				message: { id: '$m', sender: '@me:example.test', body: 'hi', timestamp: 1, status: 'sent' },
+			},
+			global: {
+				stubs: {
+					MessageReferencePreview: MessageReferencePreviewStub,
+					MessageReferencePreviewControls: true,
+				},
+			},
+		})
+
+		expect(wrapper.find('.message__read').exists()).toBe(false)
+	})
 })

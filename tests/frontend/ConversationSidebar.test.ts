@@ -45,4 +45,27 @@ describe('ConversationSidebar', () => {
 		await wrapper.get('button.conversation').trigger('click')
 		expect(wrapper.emitted('selectSearchResult')).toEqual([[{ roomId: '!meeting:chat.church.tools', message }]])
 	})
+
+	it('shows a typing indicator instead of the last message preview', () => {
+		const wrapper = mount(ConversationSidebar, {
+			props: {
+				rooms: [{
+					id: '!dm:chat.church.tools', name: 'Anna', avatarUrl: null, encrypted: false,
+					kind: 'direct', memberCount: 2, unreadCount: 0, lastMessage: null, events: [],
+					typingUsers: [{ id: '@anna:chat.church.tools', displayName: 'Anna' }],
+				}],
+				activeRoomId: null,
+				loading: false,
+				canStartChat: true,
+				query: '',
+				searchResults: [],
+				searching: false,
+				searchError: '',
+			},
+			global: { stubs: { NcAvatar: NcAvatarStub, NcButton: NcButtonStub, NcInputField: NcInputFieldStub, NcLoadingIcon: true, NcIconSvgWrapper: true } },
+		})
+
+		expect(wrapper.text()).toContain('Anna is typing…')
+		expect(wrapper.find('.conversation__preview--typing').exists()).toBe(true)
+	})
 })

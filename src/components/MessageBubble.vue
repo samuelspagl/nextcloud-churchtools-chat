@@ -25,6 +25,7 @@ const props = defineProps<{
 	focused?: boolean
 	replyToMessage?: ChatMessage | null
 	canJumpReply?: boolean
+	readByOther?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -55,6 +56,7 @@ const replyIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V3l-
 const saveIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h12l4 4v14H5V3Zm2 2v14h12V8.1L16.9 6H7Zm2 0h6v5H9V5Zm1 8v4h4v-4h-4Z"/></svg>'
 const downloadIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3h2v10.2l3.6-3.6L18 11l-6 6-6-6 1.4-1.4 3.6 3.6V3ZM5 19h14v2H5v-2Z"/></svg>'
 const deleteIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v1H4v2h16V4h-5V3H9Zm-3 5 1 12h10l1-12H6Z"/></svg>'
+const readIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7Zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l10.59-10.59L22.24 5.59ZM.41 13.41 6 19l1.41-1.41L1.83 12 .41 13.41Z"/></svg>'
 
 function downloadAttachment() {
 	const attachment = props.message.attachment
@@ -172,6 +174,12 @@ async function saveToNextcloud() {
 						<NcButton v-if="message.status === 'failed'" variant="tertiary" @click="emit('retry', message)">
 							{{ t('churchtools_chat', 'Retry') }}
 						</NcButton>
+						<NcIconSvgWrapper
+							v-if="readByOther && message.status === 'sent'"
+							class="message__read"
+							:svg="readIcon"
+							:size="14"
+							:title="t('churchtools_chat', 'Read')" />
 					</div>
 				</div>
 			</div>
@@ -201,6 +209,7 @@ async function saveToNextcloud() {
 .message__bubble--attachment { padding: 0; overflow: visible; background: transparent; }
 .message--own .message__bubble--attachment { background: transparent; }
 .message__status { display: flex; align-items: center; justify-content: flex-end; gap: 6px; color: var(--color-text-maxcontrast); font-size: 12px; }
+.message__read { flex: 0 0 auto; }
 .message__actions {
 	position: absolute;
 	z-index: 4;

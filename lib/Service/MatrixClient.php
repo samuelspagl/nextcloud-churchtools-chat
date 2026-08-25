@@ -441,6 +441,19 @@ final class MatrixClient {
 		);
 	}
 
+	public function sendTyping(string $accessToken, string $roomId, string $userId, bool $typing, int $timeout = 30000): void {
+		$body = ['typing' => $typing];
+		if ($typing) {
+			$body['timeout'] = min(max($timeout, 1000), 30000);
+		}
+		$this->request(
+			'PUT',
+			'/_matrix/client/v3/rooms/' . rawurlencode($roomId) . '/typing/' . rawurlencode($userId),
+			$accessToken,
+			$body,
+		);
+	}
+
 	/** @return array<string,mixed> */
 	public function redact(string $accessToken, string $roomId, string $eventId, string $transactionId): array {
 		return $this->request(

@@ -6,6 +6,11 @@ All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
 ### Added
 
+- Typing indicators: other participants' typing state is shown in the conversation
+  list and as an animated indicator in the chat history, and the composer publishes
+  the local typing state to Matrix while writing.
+- Read receipts in direct conversations: the last own message read by the other
+  participant is marked with a small check icon.
 - Inline replies are now rendered as a block quote above the message, showing a
   two-line excerpt of the original message. The original is resolved from the loaded
   timeline or fetched on demand, the quote can jump back to the original message, and

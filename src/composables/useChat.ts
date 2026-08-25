@@ -16,6 +16,7 @@ import {
 	searchRoomMessages as searchRoomMessagesRequest,
 	sendMessage,
 	setFullyRead,
+	setTyping as setTypingRequest,
 	startDirectChat as startDirectChatRequest,
 	syncRooms,
 } from '../services/chatApi'
@@ -388,6 +389,16 @@ export function useChat() {
 		}
 	}, { immediate: true })
 
+	async function setTyping(typing: boolean) {
+		const roomId = activeRoomId.value
+		if (!roomId) return
+		try {
+			await setTypingRequest(roomId, typing)
+		} catch {
+			// Typing state is ephemeral and best-effort; ignore failures.
+		}
+	}
+
 	async function startDirectChat(person: PersonSearchResult) {
 		startingPersonId.value = person.id
 		personSearchError.value = ''
@@ -550,6 +561,7 @@ export function useChat() {
 		focusMessage,
 		startDirectChat,
 		send,
+		setTyping,
 		retry,
 		react,
 		deleteMessage,

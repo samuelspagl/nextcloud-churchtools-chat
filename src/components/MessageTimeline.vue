@@ -4,8 +4,10 @@ import { translate as t } from '@nextcloud/l10n'
 import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, watch, useTemplateRef } from 'vue'
 import { useDayLabel } from '../composables/useDayLabel'
 import type { ChatMessage } from '../types/chat'
+import { lastReadOwnMessageId } from '../utils/readReceipts'
 import { getReplyFallbackQuote, getReplyTargetId } from '../utils/relations'
 import { buildTimeline, type TimelineItem } from '../utils/timeline'
+import { typingLabel } from '../utils/typing'
 import MessageBubble from './MessageBubble.vue'
 
 const props = defineProps<{
@@ -15,11 +17,16 @@ const props = defineProps<{
 	hasMore: boolean
 	focusMessageId: string | null
 	replyTargets: Record<string, ChatMessage>
+	typingUsers?: Array<{ id: string; displayName: string }>
+	readReceipts?: Record<string, string>
 }>()
 
 const { dayLabel } = useDayLabel()
 
 const decoratedMessages = computed<TimelineItem[]>(() => buildTimeline(props.messages))
+
+const typingText = computed(() => typingLabel(props.typingUsers ?? []))
+const lastReadMessageId = computed(() => lastReadOwnMessageId(props.messages, props.readReceipts, props.currentUserId))
 
 const replyTargetMap = computed(() => {
 	const map = new Map<string, ChatMessage>()
@@ -148,6 +155,7 @@ onBeforeUnmount(() => {
 						:reply-to-message="replyContext(message).message"
 						:fallback-text="replyContext(message).fallback"
 						:can-jump-reply="replyContext(message).canJump"
+						:read-by-other="message.id === lastReadMessageId"
 						@retry="emit('retry', $event)"
 						@reply="emit('reply', $event)"
 						@react="(message, emoji) => emit('react', message, emoji)"
@@ -155,6 +163,10 @@ onBeforeUnmount(() => {
 						@jump="jumpToReply(message)" />
 				</template>
 			</template>
+			<div v-if="typingText && !loading" class="timeline__typing" role="status">
+				<span class="timeline__typing-dots" aria-hidden="true"><i /><i /><i /></span>
+				<span>{{ typingText }}</span>
+			</div>
 		</div>
 	</section>
 </template>
@@ -184,4 +196,29 @@ onBeforeUnmount(() => {
 }
 .timeline__load-older { align-self: center; margin: 8px auto 0; padding: 6px 12px; border: none; border-radius: var(--border-radius-pill, 9999px); background: var(--color-background-dark); color: var(--color-text-maxcontrast); cursor: pointer; }
 .timeline__load-older:disabled { opacity: 0.6; cursor: default; }
+.timeline__typing {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	align-self: flex-start;
+	padding: 6px 12px;
+	border-radius: 4px 16px 16px 16px;
+	background: var(--color-background-dark);
+	color: var(--color-text-maxcontrast);
+	font-size: 13px;
+}
+.timeline__typing-dots { display: flex; gap: 3px; }
+.timeline__typing-dots i {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--color-text-maxcontrast);
+	animation: typing-bounce 1.2s infinite ease-in-out;
+}
+.timeline__typing-dots i:nth-child(2) { animation-delay: 0.2s; }
+.timeline__typing-dots i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typing-bounce {
+	0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+	30% { transform: translateY(-4px); opacity: 1; }
+}
 </style>

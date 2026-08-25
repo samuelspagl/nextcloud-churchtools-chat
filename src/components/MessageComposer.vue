@@ -3,23 +3,64 @@ import NcButton from '@nextcloud/vue/components/NcButton'
 import NcIconSvgWrapper from '@nextcloud/vue/components/NcIconSvgWrapper'
 import NcRichContenteditable from '@nextcloud/vue/components/NcRichContenteditable'
 import { translate as t } from '@nextcloud/l10n'
-import { computed, shallowRef, useTemplateRef } from 'vue'
+import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue'
 import type { ChatMessage } from '../types/chat'
 import ComposerActionsMenu from './ComposerActionsMenu.vue'
 
 const props = defineProps<{ disabled: boolean; replyTo?: ChatMessage | null }>()
-const emit = defineEmits<{ send: [body: string]; cancelReply: [] }>()
+const emit = defineEmits<{ send: [body: string]; cancelReply: []; typing: [typing: boolean] }>()
 
 const draft = shallowRef('')
 const editor = useTemplateRef<InstanceType<typeof NcRichContenteditable>>('editor')
 const canSend = computed(() => !props.disabled && draft.value.trim() !== '')
 const sendIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 21 23 12 2 3v7l15 2-15 2v7Z"/></svg>'
 
+const TYPING_HEARTBEAT_MS = 20_000
+let lastHasContent = false
+let typingHeartbeat: ReturnType<typeof window.setInterval> | undefined
+
+function stopTypingHeartbeat() {
+	if (typingHeartbeat !== undefined) {
+		window.clearInterval(typingHeartbeat)
+		typingHeartbeat = undefined
+	}
+}
+
+function reportTyping() {
+	if (props.disabled) return
+	emit('typing', true)
+	stopTypingHeartbeat()
+	typingHeartbeat = window.setInterval(() => emit('typing', true), TYPING_HEARTBEAT_MS)
+}
+
+watch(draft, () => {
+	const hasContent = draft.value.trim() !== ''
+	if (hasContent === lastHasContent) return
+	lastHasContent = hasContent
+	if (hasContent) {
+		reportTyping()
+	} else {
+		stopTypingHeartbeat()
+		emit('typing', false)
+	}
+})
+
+onBeforeUnmount(() => {
+	stopTypingHeartbeat()
+	emit('typing', false)
+})
+
 function submit() {
 	const body = draft.value.trim()
 	if (!canSend.value) return
+	clearTyping()
 	emit('send', body)
 	draft.value = ''
+}
+
+function clearTyping() {
+	stopTypingHeartbeat()
+	emit('typing', false)
 }
 
 function openSmartPicker() {

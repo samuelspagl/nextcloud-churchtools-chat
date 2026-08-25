@@ -59,6 +59,8 @@ export interface ChatRoom {
 	prevBatch?: string | null
 	hasMore?: boolean
 	fullyReadEventId?: string | null
+	typingUsers?: Array<{ id: string; displayName: string }>
+	readReceipts?: Record<string, string>
 	lastMessage: ChatMessage | null
 	events: ChatMessage[]
 }

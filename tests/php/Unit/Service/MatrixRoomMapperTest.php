@@ -135,6 +135,49 @@ final class MatrixRoomMapperTest extends TestCase {
 		self::assertSame('$prev:chat.church.tools', $room['prevBatch']);
 	}
 
+	public function testMapsEphemeralTypingUsersAndReadReceipts(): void {
+		$members = $this->mapper->members([
+			$this->member('@ct_anna:chat.church.tools', 'Anna Schmidt'),
+			$this->member('@ct_ben:chat.church.tools', 'Ben Becker'),
+		]);
+		$room = $this->mapper->room(
+			'!room:chat.church.tools',
+			[
+				'state' => ['events' => []],
+				'timeline' => ['events' => []],
+				'summary' => ['m.joined_member_count' => 2],
+				'unread_notifications' => [],
+				'ephemeral' => ['events' => [
+					[
+						'type' => 'm.typing',
+						'content' => ['user_ids' => ['@ct_anna:chat.church.tools', '@ct_me:chat.church.tools']],
+					],
+					[
+						'type' => 'm.receipt',
+						'content' => [
+							'$message:chat.church.tools' => [
+								'm.read' => ['@ct_anna:chat.church.tools' => ['ts' => 1]],
+							],
+						],
+					],
+				]],
+			],
+			[],
+			'@ct_me:chat.church.tools',
+			$members,
+		);
+
+		self::assertSame([['id' => '@ct_anna:chat.church.tools', 'displayName' => 'Anna Schmidt']], $room['typingUsers']);
+		self::assertSame(['@ct_anna:chat.church.tools' => '$message:chat.church.tools'], $room['readReceipts']);
+	}
+
+	public function testEphemeralFieldsAreEmptyWithoutEvents(): void {
+		$room = $this->mapper->room('!room:chat.church.tools', $this->roomState([]), [], '@ct_me:chat.church.tools', []);
+
+		self::assertSame([], $room['typingUsers']);
+		self::assertSame([], $room['readReceipts']);
+	}
+
 	public function testEditReplacesBodyAndMarksMessageAsEdited(): void {
 		$members = $this->mapper->members([$this->member('@ct_anna:chat.church.tools', 'Anna Schmidt')]);
 		$events = [

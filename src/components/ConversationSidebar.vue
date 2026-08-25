@@ -8,6 +8,7 @@ import { translate as t } from '@nextcloud/l10n'
 import { computed } from 'vue'
 import type { ChatMessage, ChatRoom, ConversationSearchResult } from '../types/chat'
 import { displayableAvatarUrl } from '../utils/avatar'
+import { typingLabel } from '../utils/typing'
 
 interface VisibleConversationSearchResult {
 	room: ChatRoom
@@ -55,6 +56,7 @@ function formatTime(timestamp?: number): string {
 }
 
 function searchPreview(result: VisibleConversationSearchResult): string {
+	if (result.room.typingUsers?.length) return typingLabel(result.room.typingUsers)
 	if (result.message) return `${result.message.senderName || result.message.sender}: ${result.message.body || result.message.attachment?.filename || ''}`
 	if (result.room.encrypted) return t('churchtools_chat', 'Encrypted room — unsupported')
 	const last = result.room.lastMessage
@@ -115,7 +117,7 @@ const newChatIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h1
 							<strong>{{ result.room.name }}</strong>
 							<time v-if="result.message || result.room.lastMessage">{{ formatTime((result.message || result.room.lastMessage)?.timestamp) }}</time>
 						</span>
-						<span class="conversation__preview">{{ searchPreview(result) }}</span>
+						<span class="conversation__preview" :class="{ 'conversation__preview--typing': result.room.typingUsers?.length }">{{ searchPreview(result) }}</span>
 					</span>
 					<span v-if="result.room.unreadCount > 0" class="conversation__badge" :aria-label="`${result.room.unreadCount} unread messages`">
 						{{ result.room.unreadCount > 99 ? '99+' : result.room.unreadCount }}
@@ -145,5 +147,6 @@ const newChatIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h1
 .conversation__topline strong, .conversation__preview { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .conversation__topline time { color: var(--color-text-maxcontrast); font-size: 12px; }
 .conversation__preview { display: block; color: var(--color-text-maxcontrast); font-size: 13px; }
+.conversation__preview--typing { color: var(--color-primary-element); font-style: italic; }
 .conversation__badge { min-width: 22px; padding: 2px 6px; border-radius: 999px; color: var(--color-primary-element-text); background: var(--color-primary-element); font-size: 12px; text-align: center; }
 </style>

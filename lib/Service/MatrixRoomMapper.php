@@ -93,6 +93,8 @@ final class MatrixRoomMapper {
 			}
 		}
 
+		$ephemeral = $this->ephemeral($room, $memberMap, $currentUserId);
+
 		return [
 			'id' => $roomId,
 			'name' => $name,
@@ -104,8 +106,62 @@ final class MatrixRoomMapper {
 			'limited' => $limited,
 			'prevBatch' => $prevBatch,
 			'fullyReadEventId' => $fullyReadEventId,
+			'typingUsers' => $ephemeral['typingUsers'],
+			'readReceipts' => $ephemeral['readReceipts'],
 			'lastMessage' => $lastMessage,
 			'events' => $messages,
+		];
+	}
+
+	/**
+	 * Read the ephemeral room events from a sync response: typing users and public
+	 * read receipts (m.read), excluding the current user's own state.
+	 *
+	 * @param array<string,mixed> $room
+	 * @param array<string,array{id:string,displayName:string,avatarUrl:string|null,membership:string}> $memberMap
+	 * @return array{typingUsers:list<array{id:string,displayName:string}>,readReceipts:array<string,string>}
+	 */
+	private function ephemeral(array $room, array $memberMap, string $currentUserId): array {
+		$typing = [];
+		$readReceipts = [];
+		$events = is_array($room['ephemeral']['events'] ?? null) ? $room['ephemeral']['events'] : [];
+		foreach ($events as $event) {
+			if (!is_array($event) || !is_array($event['content'] ?? null)) {
+				continue;
+			}
+			$content = $event['content'];
+			$type = $event['type'] ?? '';
+			if ($type === 'm.typing') {
+				$userIds = is_array($content['user_ids'] ?? null) ? $content['user_ids'] : [];
+				foreach ($userIds as $matrixUserId) {
+					if (!is_string($matrixUserId) || $matrixUserId === '' || $matrixUserId === $currentUserId) {
+						continue;
+					}
+					$member = $memberMap[$matrixUserId] ?? null;
+					$typing[$matrixUserId] = [
+						'id' => $matrixUserId,
+						'displayName' => $member['displayName'] ?? $this->fallbackUserName($matrixUserId),
+					];
+				}
+			} elseif ($type === 'm.receipt') {
+				foreach ($content as $eventId => $receipts) {
+					if (!is_string($eventId) || !is_array($receipts)) {
+						continue;
+					}
+					$read = is_array($receipts['m.read'] ?? null) ? $receipts['m.read'] : [];
+					foreach ($read as $matrixUserId => $_details) {
+						if (!is_string($matrixUserId) || $matrixUserId === '' || $matrixUserId === $currentUserId) {
+							continue;
+						}
+						// The last receipt for a user marks the newest event they have read.
+						$readReceipts[$matrixUserId] = $eventId;
+					}
+				}
+			}
+		}
+		return [
+			'typingUsers' => array_values($typing),
+			'readReceipts' => $readReceipts,
 		];
 	}
 

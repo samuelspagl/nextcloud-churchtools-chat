@@ -93,6 +93,12 @@ final class ChatController extends ApiController {
 	}
 
 	/** @NoAdminRequired */
+	public function typing(string $roomId, bool $typing): JSONResponse {
+		$this->gateway->setTyping($this->userContext->getUserId(), $roomId, $typing);
+		return new JSONResponse([]);
+	}
+
+	/** @NoAdminRequired */
 	public function sync(?string $since = null): JSONResponse {
 		return $this->respond(fn (): array => $this->gateway->sync($this->userContext->getUserId(), $since));
 	}

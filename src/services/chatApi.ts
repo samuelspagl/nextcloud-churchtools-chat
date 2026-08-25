@@ -108,6 +108,13 @@ export async function setFullyRead(roomId: string, eventId: string): Promise<voi
 	)
 }
 
+export async function setTyping(roomId: string, typing: boolean): Promise<void> {
+	await axios.post(
+		endpoint(`/api/rooms/${encodeURIComponent(roomId)}/typing`),
+		{ typing },
+	)
+}
+
 export async function deleteMessage(roomId: string, eventId: string): Promise<void> {
 	await axios.post(endpoint(`/api/rooms/${encodeURIComponent(roomId)}/messages/${encodeURIComponent(eventId)}/redact`))
 }
