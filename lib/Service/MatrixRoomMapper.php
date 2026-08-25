@@ -114,20 +114,19 @@ final class MatrixRoomMapper {
 	}
 
 	/**
-	 * Candidate Matrix room alias for a ChurchTools chat, following the same
-	 * derivation as the @ct_<guid> user ids: #<prefix>_<lowercase-guid>:<server>.
+	 * Matrix room alias for a ChurchTools chat, following the same derivation as
+	 * the @ct_<guid> user ids: #<prefix>_<lowercase-guid>:<server>.
 	 *
-	 * This is a working hypothesis of the D5 mapping spike and must be confirmed
-	 * against a live tenant before the app relies on it.
+	 * Confirmed by the D5 mapping spike on 2026-08-25: the alias resolves through
+	 * the Matrix room directory to the chat's room.
 	 */
 	public function chatRoomAlias(string $prefix, string $guid, string $server): string {
 		return '#' . strtolower($prefix) . '_' . strtolower($guid) . ':' . strtolower($server);
 	}
 
 	/**
-	 * Heuristically match ChurchTools chats to joined Matrix rooms until the exact
-	 * mapping is confirmed. Rooms use the shape produced by the D5 probe
-	 * (roomId + extracted state events).
+	 * Match ChurchTools chats to joined Matrix rooms via the confirmed alias
+	 * derivation, falling back to the room display name.
 	 *
 	 * @param list<array{creator:int|null,domainId:int,guid:string,prefix:string,roomname:string|null,status:string}> $chats
 	 * @param list<array{roomId:string,state:array<string,mixed>}> $rooms

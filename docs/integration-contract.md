@@ -69,23 +69,34 @@ Related endpoints:
   chat with `{ "enabled": bool, "triggerChatInviteMail": bool }`; the server
   generates the `guid`, `prefix` and `roomname` itself.
 
-### CT chat -> Matrix room mapping (D5 spike)
+### CT chat -> Matrix room mapping (D5 spike, confirmed)
 
 The OpenAPI does not expose any Matrix room identifier, alias, or state event for
-a chat. The exact room mapping therefore has to be verified empirically.
+a chat. The mapping was confirmed empirically on 2026-08-25 via
+`occ churchtools_chat:probe`: each candidate alias below resolved through the
+Matrix room directory to a real room id.
 
-Working hypothesis (to confirm via `occ churchtools_chat:probe`): the Matrix room
-is addressed through a canonical alias derived from the chat `prefix` and GUID,
-analogous to the `@ct_<guid>` user-id derivation:
+The Matrix room for a ChurchTools chat is addressed by a canonical alias derived
+from the chat `prefix` and GUID, analogous to the `@ct_<guid>` user-id derivation:
 
 ```text
 #<prefix>_<lowercase-guid>:<matrix-server-name>
-#ctg_681f54e3-2eb7-40a4-84f0-eff8e8f05727:chat.church.tools
+#cte_59049027-6296-47d5-9085-affc76ada326:chat.church.tools
+  -> !WOPBtHRquRdJWSPHIM:chat.church.tools
 ```
 
-The mapping may instead be carried by the room's `m.room.name` (`roomname`) or a
-custom state event holding the `domainId`/`guid`. Until confirmed, the app must
-not rely on a single formula.
+Observed chat `prefix` values (determine the chat type, see D6):
+
+| Prefix | Type |
+|---|---|
+| `cte` | event chat (`domainId` = event id, `roomname` = event title) |
+| `ctg` | group chat (from the OpenAPI example; `domainId` = group id) |
+| `cta` | announcement chat (expected; to be confirmed with live data) |
+
+Other observations: a `creator` of `-4` marks chats created by the ChurchTools
+system. `/api/chat` lists chats the person is involved in even when they are not
+(yet) a member of the Matrix room; the room can be found by resolving the alias
+without joining.
 
 The published OpenAPI does **not** expose message events or a Matrix
 token-exchange/bootstrap endpoint. Those capabilities must not be invented from
