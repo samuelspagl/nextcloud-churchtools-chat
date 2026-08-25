@@ -38,6 +38,7 @@ const {
 	searchingMessages,
 	messageSearchError,
 	focusedMessageId,
+	replyTargets,
 	selectRoom,
 	searchPersons,
 	clearPersonSearch,
@@ -47,8 +48,10 @@ const {
 	focusMessage,
 	startDirectChat,
 	send,
+	setTyping,
 	retry,
 	react,
+	unreact,
 	deleteMessage,
 	loadOlderMessages,
 	toggleDetails,
@@ -148,6 +151,14 @@ async function reactToMessage(message: ChatMessage, emoji: string) {
 	}
 }
 
+async function unreactToMessage(message: ChatMessage, emoji: string) {
+	try {
+		await unreact(message, emoji)
+	} catch {
+		// The next sync reconciles reactions if the optimistic update cannot be applied.
+	}
+}
+
 async function retryMessage(message: ChatMessage) {
 	try {
 		await retry(message)
@@ -214,14 +225,20 @@ async function retryMessage(message: ChatMessage) {
 						:loading="loadingMessages"
 						:has-more="activeRoom?.hasMore ?? false"
 						:focus-message-id="focusedMessageId"
+						:reply-targets="replyTargets"
+						:typing-users="activeRoom?.typingUsers ?? []"
+						:read-receipts="activeRoom?.kind === 'direct' ? activeRoom?.readReceipts : undefined"
 						@load-older="loadOlderMessages(activeRoomId ?? '')"
 						@retry="retryMessage"
 						@reply="replyTarget = $event"
 						@react="reactToMessage"
-						@delete="deleteMessage" />
+						@unreact="unreactToMessage"
+						@delete="deleteMessage"
+						@jump="focusMessage" />
 					<MessageComposer
 						:disabled="!status?.capabilities.send || activeRoom.encrypted"
 						:reply-to="replyTarget"
+						@typing="setTyping"
 						@cancel-reply="replyTarget = null"
 						@send="sendMessage" />
 				</template>

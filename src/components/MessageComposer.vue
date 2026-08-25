@@ -1,29 +1,117 @@
 <script setup lang="ts">
 import NcButton from '@nextcloud/vue/components/NcButton'
+import NcEmojiPicker from '@nextcloud/vue/components/NcEmojiPicker'
 import NcIconSvgWrapper from '@nextcloud/vue/components/NcIconSvgWrapper'
 import NcRichContenteditable from '@nextcloud/vue/components/NcRichContenteditable'
 import { translate as t } from '@nextcloud/l10n'
-import { computed, shallowRef, useTemplateRef } from 'vue'
+import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue'
 import type { ChatMessage } from '../types/chat'
 import ComposerActionsMenu from './ComposerActionsMenu.vue'
 
 const props = defineProps<{ disabled: boolean; replyTo?: ChatMessage | null }>()
-const emit = defineEmits<{ send: [body: string]; cancelReply: [] }>()
+const emit = defineEmits<{ send: [body: string]; cancelReply: []; typing: [typing: boolean] }>()
 
 const draft = shallowRef('')
 const editor = useTemplateRef<InstanceType<typeof NcRichContenteditable>>('editor')
 const canSend = computed(() => !props.disabled && draft.value.trim() !== '')
 const sendIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 21 23 12 2 3v7l15 2-15 2v7Z"/></svg>'
+const smileyIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-3.5-9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm7 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM12 17.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5Z"/></svg>'
+
+const TYPING_HEARTBEAT_MS = 20_000
+let lastHasContent = false
+let typingHeartbeat: ReturnType<typeof window.setInterval> | undefined
+
+function stopTypingHeartbeat() {
+	if (typingHeartbeat !== undefined) {
+		window.clearInterval(typingHeartbeat)
+		typingHeartbeat = undefined
+	}
+}
+
+function reportTyping() {
+	if (props.disabled) return
+	emit('typing', true)
+	stopTypingHeartbeat()
+	typingHeartbeat = window.setInterval(() => emit('typing', true), TYPING_HEARTBEAT_MS)
+}
+
+watch(draft, () => {
+	const hasContent = draft.value.trim() !== ''
+	if (hasContent === lastHasContent) return
+	lastHasContent = hasContent
+	if (hasContent) {
+		reportTyping()
+	} else {
+		stopTypingHeartbeat()
+		emit('typing', false)
+	}
+})
+
+onBeforeUnmount(() => {
+	stopTypingHeartbeat()
+	emit('typing', false)
+})
 
 function submit() {
 	const body = draft.value.trim()
 	if (!canSend.value) return
+	clearTyping()
 	emit('send', body)
 	draft.value = ''
 }
 
+function clearTyping() {
+	stopTypingHeartbeat()
+	emit('typing', false)
+}
+
 function openSmartPicker() {
 	editor.value?.showTribute('/')
+}
+
+let savedRange: Range | null = null
+
+function editorElement(): HTMLElement | null {
+	const el = editor.value?.$el as HTMLElement | undefined
+	return el?.querySelector<HTMLElement>('[contenteditable]') ?? null
+}
+
+function onEmojiTriggerMousedown(event: MouseEvent) {
+	const editable = editorElement()
+	const selection = window.getSelection()
+	if (editable && selection && selection.rangeCount > 0) {
+		const range = selection.getRangeAt(0)
+		if (editable.contains(range.commonAncestorContainer)) {
+			savedRange = range.cloneRange()
+		}
+	}
+	// Keep the editor focused so its selection survives opening the picker.
+	event.preventDefault()
+}
+
+function insertEmoji(emoji: string) {
+	const editable = editorElement()
+	if (editable && savedRange) {
+		editable.focus()
+		const selection = window.getSelection()
+		if (selection) {
+			selection.removeAllRanges()
+			selection.addRange(savedRange)
+		}
+		savedRange = null
+		let inserted = false
+		try {
+			inserted = document.execCommand('insertText', false, emoji)
+		} catch {
+			// execCommand is not available everywhere (e.g. tests).
+		}
+		if (inserted) {
+			// The picker refocuses its trigger on close; keep the editor focused for typing.
+			window.setTimeout(() => editorElement()?.focus(), 0)
+			return
+		}
+	}
+	draft.value += emoji
 }
 </script>
 
@@ -36,6 +124,18 @@ function openSmartPicker() {
 			</div>
 			<div class="composer__controls">
 				<ComposerActionsMenu :disabled="disabled" @open-smart-picker="openSmartPicker" />
+				<NcEmojiPicker :close-on-select="true" @select="insertEmoji">
+					<NcButton
+						variant="tertiary"
+						:disabled="disabled"
+						:aria-label="t('churchtools_chat', 'Insert emoji')"
+						:title="t('churchtools_chat', 'Insert emoji')"
+						@mousedown="onEmojiTriggerMousedown">
+						<template #icon>
+							<NcIconSvgWrapper :svg="smileyIcon" :size="24" />
+						</template>
+					</NcButton>
+				</NcEmojiPicker>
 				<NcRichContenteditable
 					ref="editor"
 					v-model="draft"

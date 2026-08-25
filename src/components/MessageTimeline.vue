@@ -2,13 +2,13 @@
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import { translate as t } from '@nextcloud/l10n'
 import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, watch, useTemplateRef } from 'vue'
+import { useDayLabel } from '../composables/useDayLabel'
 import type { ChatMessage } from '../types/chat'
+import { lastReadOwnMessageId } from '../utils/readReceipts'
+import { getReplyFallbackQuote, getReplyTargetId } from '../utils/relations'
+import { buildTimeline, type TimelineItem } from '../utils/timeline'
+import { typingLabel } from '../utils/typing'
 import MessageBubble from './MessageBubble.vue'
-
-interface DecoratedMessage extends ChatMessage {
-	showDateSeparator: boolean
-	grouped: boolean
-}
 
 const props = defineProps<{
 	messages: readonly ChatMessage[]
@@ -16,47 +16,54 @@ const props = defineProps<{
 	loading: boolean
 	hasMore: boolean
 	focusMessageId: string | null
+	replyTargets: Record<string, ChatMessage>
+	typingUsers?: Array<{ id: string; displayName: string }>
+	readReceipts?: Record<string, string>
 }>()
 
-const DAY_MS = 86_400_000
+const { dayLabel } = useDayLabel()
 
-function startOfDay(timestamp: number): number {
-	const date = new Date(timestamp)
-	date.setHours(0, 0, 0, 0)
-	return date.getTime()
-}
+const decoratedMessages = computed<TimelineItem[]>(() => buildTimeline(props.messages))
 
-const dayFormatter = new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
-const today = startOfDay(Date.now())
-const yesterday = today - DAY_MS
+const typingText = computed(() => typingLabel(props.typingUsers ?? []))
+const lastReadMessageId = computed(() => lastReadOwnMessageId(props.messages, props.readReceipts, props.currentUserId))
 
-function dayLabel(timestamp: number): string {
-	const day = startOfDay(timestamp)
-	if (day === today) return t('churchtools_chat', 'Today')
-	if (day === yesterday) return t('churchtools_chat', 'Yesterday')
-	return dayFormatter.format(timestamp)
-}
-
-const decoratedMessages = computed<DecoratedMessage[]>(() => {
-	const result: DecoratedMessage[] = []
-	let previous: ChatMessage | null = null
+const replyTargetMap = computed(() => {
+	const map = new Map<string, ChatMessage>()
 	for (const message of props.messages) {
-		const showDateSeparator = previous === null || startOfDay(previous.timestamp) !== startOfDay(message.timestamp)
-		const grouped = !showDateSeparator
-			&& previous !== null
-			&& previous.sender === message.sender
-			&& message.timestamp - previous.timestamp < 5 * 60 * 1000
-		result.push({ ...message, showDateSeparator, grouped })
-		previous = message
+		map.set(message.id, message)
 	}
-	return result
+	for (const [eventId, message] of Object.entries(props.replyTargets)) {
+		map.set(eventId, message)
+	}
+	return map
 })
+
+function replyContext(message: ChatMessage): { message: ChatMessage | null; canJump: boolean; fallback: string | null } {
+	const targetId = getReplyTargetId(message)
+	if (targetId === null) {
+		return { message: null, canJump: false, fallback: getReplyFallbackQuote(message) }
+	}
+	return {
+		message: replyTargetMap.value.get(targetId) ?? null,
+		canJump: props.messages.some((item) => item.id === targetId),
+		fallback: null,
+	}
+}
+
+function jumpToReply(message: ChatMessage) {
+	const targetId = getReplyTargetId(message)
+	const target = targetId !== null ? replyTargetMap.value.get(targetId) : undefined
+	if (target) emit('jump', target)
+}
 
 const emit = defineEmits<{
 	retry: [message: ChatMessage]
 	reply: [message: ChatMessage]
 	react: [message: ChatMessage, emoji: string]
+	unreact: [message: ChatMessage, emoji: string]
 	delete: [message: ChatMessage]
+	jump: [message: ChatMessage]
 	loadOlder: []
 }>()
 const timeline = useTemplateRef<HTMLElement>('timeline')
@@ -146,12 +153,22 @@ onBeforeUnmount(() => {
 						:current-user-id="currentUserId"
 						:grouped="message.grouped"
 						:focused="message.id === focusMessageId"
+						:reply-to-message="replyContext(message).message"
+						:fallback-text="replyContext(message).fallback"
+						:can-jump-reply="replyContext(message).canJump"
+						:read-by-other="message.id === lastReadMessageId"
 						@retry="emit('retry', $event)"
 						@reply="emit('reply', $event)"
 						@react="(message, emoji) => emit('react', message, emoji)"
-						@delete="emit('delete', $event)" />
+						@unreact="(message, emoji) => emit('unreact', message, emoji)"
+						@delete="emit('delete', $event)"
+						@jump="jumpToReply(message)" />
 				</template>
 			</template>
+			<div v-if="typingText && !loading" class="timeline__typing" role="status">
+				<span class="timeline__typing-dots" aria-hidden="true"><i /><i /><i /></span>
+				<span>{{ typingText }}</span>
+			</div>
 		</div>
 	</section>
 </template>
@@ -160,9 +177,50 @@ onBeforeUnmount(() => {
 .timeline { width: 100%; min-height: 0; overflow-y: auto; }
 .timeline__content { display: flex; width: 100%; min-height: 100%; flex-direction: column; gap: 14px; padding: 24px clamp(16px, 4vw, 56px); }
 .timeline__state { margin: auto; color: var(--color-text-maxcontrast); }
-.timeline__day { display: flex; align-items: center; justify-content: center; margin: 8px 0; color: var(--color-text-maxcontrast); font-size: 12px; }
-.timeline__day::before, .timeline__day::after { flex: 1; height: 1px; content: ''; background: var(--color-border); }
-.timeline__day span { padding: 0 12px; }
+.timeline__day {
+	position: sticky;
+	z-index: 2;
+	top: 8px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin: 4px 0;
+	pointer-events: none;
+}
+.timeline__day span {
+	padding: 4px 14px;
+	border-radius: var(--border-radius-element, var(--border-radius-pill, 9999px));
+	background: var(--color-background-dark);
+	color: var(--color-text-maxcontrast);
+	font-size: 12px;
+	white-space: nowrap;
+	text-transform: capitalize;
+}
 .timeline__load-older { align-self: center; margin: 8px auto 0; padding: 6px 12px; border: none; border-radius: var(--border-radius-pill, 9999px); background: var(--color-background-dark); color: var(--color-text-maxcontrast); cursor: pointer; }
 .timeline__load-older:disabled { opacity: 0.6; cursor: default; }
+.timeline__typing {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	align-self: flex-start;
+	padding: 6px 12px;
+	border-radius: 4px 16px 16px 16px;
+	background: var(--color-background-dark);
+	color: var(--color-text-maxcontrast);
+	font-size: 13px;
+}
+.timeline__typing-dots { display: flex; gap: 3px; }
+.timeline__typing-dots i {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--color-text-maxcontrast);
+	animation: typing-bounce 1.2s infinite ease-in-out;
+}
+.timeline__typing-dots i:nth-child(2) { animation-delay: 0.2s; }
+.timeline__typing-dots i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typing-bounce {
+	0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+	30% { transform: translateY(-4px); opacity: 1; }
+}
 </style>

@@ -239,6 +239,31 @@ final class MatrixClientTest extends TestCase {
 		]], $this->matrix->searchMessages('secret-token', 'meeting notes'));
 	}
 
+	public function testFetchesASingleRoomEvent(): void {
+		$this->response->method('getStatusCode')->willReturn(200);
+		$this->response->method('getBody')->willReturn(json_encode([
+			'type' => 'm.room.message',
+			'event_id' => '$target:chat.church.tools',
+			'content' => ['msgtype' => 'm.text', 'body' => 'original'],
+		], JSON_THROW_ON_ERROR));
+		$this->httpClient
+			->expects(self::once())
+			->method('get')
+			->with(
+				'https://chat.church.tools/_matrix/client/v3/rooms/%21room%3Achat.church.tools/event/%24target%3Achat.church.tools',
+				self::callback(static function (array $options): bool {
+					self::assertSame('Bearer secret-token', $options['headers']['Authorization']);
+					return true;
+				}),
+			)
+			->willReturn($this->response);
+
+		$event = $this->matrix->event('secret-token', '!room:chat.church.tools', '$target:chat.church.tools');
+
+		self::assertSame('m.room.message', $event['type']);
+		self::assertSame('original', $event['content']['body']);
+	}
+
 	/** @dataProvider matrixFailureStatuses */
 	public function testMapsMatrixHttpFailures(int $status, string $errorCode, int $httpStatus): void {
 		$this->configureResponse($status, 'image/png', 'ignored');
@@ -314,6 +339,105 @@ final class MatrixClientTest extends TestCase {
 		$result = $this->matrix->editMessage('secret-token', '!room:chat.church.tools', '$target:chat.church.tools', 'new body', 'nc-txn');
 
 		self::assertSame('$edited:chat.church.tools', $result['event_id']);
+	}
+
+	public function testSendsTypingIndicatorWithTimeout(): void {
+		$this->response->method('getStatusCode')->willReturn(200);
+		$this->response->method('getBody')->willReturn('{}');
+		$this->httpClient
+			->expects(self::once())
+			->method('put')
+			->with(
+				'https://chat.church.tools/_matrix/client/v3/rooms/%21room%3Achat.church.tools/typing/%40me%3Achat.church.tools',
+				self::callback(static function (array $options): bool {
+					self::assertSame('Bearer secret-token', $options['headers']['Authorization']);
+					self::assertSame([
+						'typing' => true,
+						'timeout' => 30000,
+					], json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR));
+					return true;
+				}),
+			)
+			->willReturn($this->response);
+
+		$this->matrix->sendTyping('secret-token', '!room:chat.church.tools', '@me:chat.church.tools', true);
+	}
+
+	public function testClearsTypingIndicatorWithoutTimeout(): void {
+		$this->response->method('getStatusCode')->willReturn(200);
+		$this->response->method('getBody')->willReturn('{}');
+		$this->httpClient
+			->expects(self::once())
+			->method('put')
+			->with(
+				'https://chat.church.tools/_matrix/client/v3/rooms/%21room%3Achat.church.tools/typing/%40me%3Achat.church.tools',
+				self::callback(static function (array $options): bool {
+					self::assertSame(['typing' => false], json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR));
+					return true;
+				}),
+			)
+			->willReturn($this->response);
+
+		$this->matrix->sendTyping('secret-token', '!room:chat.church.tools', '@me:chat.church.tools', false);
+	}
+
+	public function testResolvesRoomAliasFromDirectory(): void {
+		$this->response->method('getStatusCode')->willReturn(200);
+		$this->response->method('getBody')->willReturn(json_encode(['room_id' => '!room:chat.church.tools'], JSON_THROW_ON_ERROR));
+		$this->httpClient
+			->expects(self::once())
+			->method('get')
+			->with(
+				'https://chat.church.tools/_matrix/client/v3/directory/room/%23ctg_guid%3Achat.church.tools',
+				self::callback(static fn (array $options): bool => ($options['headers']['Authorization'] ?? '') === 'Bearer secret-token'),
+			)
+			->willReturn($this->response);
+
+		self::assertSame('!room:chat.church.tools', $this->matrix->resolveRoomAlias('secret-token', '#ctg_guid:chat.church.tools'));
+	}
+
+	public function testResolveRoomAliasReturnsNullWhenAliasDoesNotExist(): void {
+		$this->response->method('getStatusCode')->willReturn(404);
+		$this->response->method('getBody')->willReturn('{"errcode":"M_NOT_FOUND"}');
+		$this->httpClient->method('get')->willReturn($this->response);
+
+		self::assertNull($this->matrix->resolveRoomAlias('secret-token', '#ctg_missing:chat.church.tools'));
+	}
+
+	public function testRedactSendsEmptyJsonObjectBody(): void {
+		$this->response->method('getStatusCode')->willReturn(200);
+		$this->response->method('getBody')->willReturn('{}');
+		$this->httpClient
+			->expects(self::once())
+			->method('put')
+			->with(
+				'https://chat.church.tools/_matrix/client/v3/rooms/%21room%3Achat.church.tools/redact/%24target%3Achat.church.tools/nc-txn',
+				self::callback(static function (array $options): bool {
+					self::assertSame('Bearer secret-token', $options['headers']['Authorization'] ?? '');
+					self::assertSame('{}', $options['body'] ?? '');
+					return true;
+				}),
+			)
+			->willReturn($this->response);
+
+		$this->matrix->redact('secret-token', '!room:chat.church.tools', '$target:chat.church.tools', 'nc-txn');
+	}
+
+	public function testSurfacesMatrixErrorCodeAndMessage(): void {
+		$this->response->method('getStatusCode')->willReturn(404);
+		$this->response->method('getBody')->willReturn(json_encode([
+			'errcode' => 'M_NOT_FOUND',
+			'error' => 'Event not found.',
+		], JSON_THROW_ON_ERROR));
+		$this->httpClient->method('get')->willReturn($this->response);
+
+		try {
+			$this->matrix->sync('token', null);
+			self::fail('Expected an IntegrationException.');
+		} catch (IntegrationException $exception) {
+			self::assertSame('matrix_request_failed', $exception->getErrorCode());
+			self::assertSame('M_NOT_FOUND: Event not found.', $exception->getMessage());
+		}
 	}
 
 	private function configureResponse(int $status, string $contentType, string $body): void {

@@ -166,6 +166,15 @@ final class MatrixClient {
 		}
 	}
 
+	/** @return array<string,mixed> */
+	public function event(string $accessToken, string $roomId, string $eventId): array {
+		return $this->request(
+			'GET',
+			'/_matrix/client/v3/rooms/' . rawurlencode($roomId) . '/event/' . rawurlencode($eventId),
+			$accessToken,
+		);
+	}
+
 	/** @return array<string,list<string>> */
 	public function getDirectRooms(string $accessToken, string $currentUserId): array {
 		try {
@@ -432,17 +441,46 @@ final class MatrixClient {
 		);
 	}
 
+	public function sendTyping(string $accessToken, string $roomId, string $userId, bool $typing, int $timeout = 30000): void {
+		$body = ['typing' => $typing];
+		if ($typing) {
+			$body['timeout'] = min(max($timeout, 1000), 30000);
+		}
+		$this->request(
+			'PUT',
+			'/_matrix/client/v3/rooms/' . rawurlencode($roomId) . '/typing/' . rawurlencode($userId),
+			$accessToken,
+			$body,
+		);
+	}
+
+	/**
+	 * Resolve a room alias to a room id via the room directory, or null when the
+	 * alias does not exist on the homeserver.
+	 */
+	public function resolveRoomAlias(string $accessToken, string $alias): ?string {
+		try {
+			$result = $this->request('GET', '/_matrix/client/v3/directory/room/' . rawurlencode($alias), $accessToken);
+			$roomId = $result['room_id'] ?? null;
+			return is_string($roomId) && $roomId !== '' ? $roomId : null;
+		} catch (IntegrationException) {
+			return null;
+		}
+	}
+
 	/** @return array<string,mixed> */
 	public function redact(string $accessToken, string $roomId, string $eventId, string $transactionId): array {
 		return $this->request(
 			'PUT',
 			'/_matrix/client/v3/rooms/' . rawurlencode($roomId) . '/redact/' . rawurlencode($eventId) . '/' . rawurlencode($transactionId),
 			$accessToken,
+			// Synapse rejects an empty body with M_NOT_JSON, so send an empty JSON object.
+			(object)[],
 		);
 	}
 
 	/** @return array<string,mixed> */
-	private function request(string $method, string $path, ?string $accessToken = null, ?array $body = null, bool $mapAuthFailure = true): array {
+	private function request(string $method, string $path, ?string $accessToken = null, array|object|null $body = null, bool $mapAuthFailure = true): array {
 		$options = [
 			'headers' => ['Accept' => 'application/json', 'Content-Type' => 'application/json'],
 			'connect_timeout' => 5,
@@ -485,7 +523,13 @@ final class MatrixClient {
 				throw new IntegrationException('matrix_rate_limited', 'Matrix rate limited the request.', 429, $retryAfter);
 			}
 			if ($status < 200 || $status >= 300) {
-				throw new IntegrationException('matrix_request_failed', 'Matrix could not complete the request.', 502);
+				$errcode = is_string($data['errcode'] ?? null) && $data['errcode'] !== ''
+					? (string)$data['errcode']
+					: 'HTTP ' . $status;
+				$error = is_string($data['error'] ?? null) && $data['error'] !== ''
+					? (string)$data['error']
+					: 'Matrix could not complete the request.';
+				throw new IntegrationException('matrix_request_failed', $errcode . ': ' . $error, 502);
 			}
 			return $data;
 		} catch (IntegrationException $e) {

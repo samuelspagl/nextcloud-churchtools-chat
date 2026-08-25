@@ -34,6 +34,7 @@ export interface ChatMessage {
 	mentionsMe?: boolean
 	relatesTo?: Record<string, unknown> | null
 	reactions?: Record<string, number>
+	ownReactions?: ReadonlyArray<{ readonly key: string; readonly eventId: string }>
 	status?: 'sending' | 'sent' | 'failed'
 	transactionId?: string
 	attachment?: ChatAttachment
@@ -59,6 +60,8 @@ export interface ChatRoom {
 	prevBatch?: string | null
 	hasMore?: boolean
 	fullyReadEventId?: string | null
+	typingUsers?: Array<{ id: string; displayName: string }>
+	readReceipts?: Record<string, string>
 	lastMessage: ChatMessage | null
 	events: ChatMessage[]
 }
@@ -85,10 +88,19 @@ export interface RoomDetails {
 	members: readonly RoomMember[]
 }
 
+export interface ChurchToolsChat {
+	creator: number | null
+	domainId: number
+	guid: string
+	prefix: string
+	roomname: string | null
+	status: 'NOT_STARTED' | 'STARTED' | 'STARTING' | 'STOPPED'
+}
+
 export interface RoomsResponse {
 	rooms: ChatRoom[]
 	nextBatch: string | null
-	churchToolsChats: Array<Record<string, unknown>>
+	churchToolsChats: ChurchToolsChat[]
 }
 
 export interface MessagesResponse {

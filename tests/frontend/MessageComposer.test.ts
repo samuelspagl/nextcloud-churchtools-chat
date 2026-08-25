@@ -31,6 +31,14 @@ const NcRichContenteditableStub = defineComponent({
 	template: '<textarea :value="modelValue" :disabled="disabled" :placeholder="placeholder" @input="update" />',
 })
 
+const NcEmojiPickerStub = defineComponent({
+	props: {
+		closeOnSelect: { type: Boolean, default: false },
+	},
+	emits: ['select', 'selectData', 'unselect'],
+	template: '<div><slot /></div>',
+})
+
 const NcButtonStub = defineComponent({
 	props: {
 		disabled: { type: Boolean, default: false },
@@ -67,6 +75,7 @@ function mountComposer(disabled = false) {
 				NcActionButton: NcActionButtonStub,
 				NcActions: NcActionsStub,
 				NcButton: NcButtonStub,
+				NcEmojiPicker: NcEmojiPickerStub,
 				NcIconSvgWrapper: true,
 				NcRichContenteditable: NcRichContenteditableStub,
 			},
@@ -110,5 +119,35 @@ describe('MessageComposer', () => {
 
 		expect(wrapper.emitted('send')).toEqual([['Hello from Smart Picker']])
 		expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('')
+	})
+
+	it('emits typing while content is present and stops when it is cleared', async () => {
+		const wrapper = mountComposer()
+
+		await wrapper.get('textarea').setValue('hi')
+		expect(wrapper.emitted('typing')?.flat()).toContain(true)
+
+		await wrapper.get('textarea').setValue('')
+		expect(wrapper.emitted('typing')?.flat()).toContain(false)
+	})
+
+	it('clears typing when sending a message', async () => {
+		const wrapper = mountComposer()
+
+		await wrapper.get('textarea').setValue('hello')
+		await wrapper.get('form').trigger('submit')
+
+		const typingCalls = wrapper.emitted('typing')?.flat()
+		expect(typingCalls).toContain(true)
+		expect(typingCalls).toContain(false)
+		expect(typingCalls!.indexOf(false)).toBeGreaterThan(typingCalls!.indexOf(true))
+	})
+
+	it('appends a picked emoji to the draft', async () => {
+		const wrapper = mountComposer()
+
+		await wrapper.findComponent(NcEmojiPickerStub).vm.$emit('select', '👍')
+
+		expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('👍')
 	})
 })

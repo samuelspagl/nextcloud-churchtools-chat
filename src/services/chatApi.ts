@@ -1,6 +1,7 @@
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import type {
+	ChatMessage,
 	ChatStatus,
 	ConversationSearchResponse,
 	DirectChatResponse,
@@ -55,6 +56,13 @@ export async function getMessages(roomId: string, from?: string): Promise<Messag
 	return response.data.data
 }
 
+export async function getEvent(roomId: string, eventId: string): Promise<ChatMessage> {
+	const response = await axios.get<ApiEnvelope<ChatMessage>>(
+		endpoint(`/api/rooms/${encodeURIComponent(roomId)}/messages/${encodeURIComponent(eventId)}`),
+	)
+	return response.data.data
+}
+
 export async function searchRoomMessages(roomId: string, query: string): Promise<MessageSearchResponse> {
 	const response = await axios.get<ApiEnvelope<MessageSearchResponse>>(
 		endpoint(`/api/rooms/${encodeURIComponent(roomId)}/search`),
@@ -78,11 +86,12 @@ export async function sendMessage(roomId: string, body: string, transactionId: s
 	return response.data.data
 }
 
-export async function reactToMessage(roomId: string, eventId: string, emoji: string, transactionId: string): Promise<void> {
-	await axios.post(
+export async function reactToMessage(roomId: string, eventId: string, emoji: string, transactionId: string): Promise<{ eventId: string; transactionId: string }> {
+	const response = await axios.post<ApiEnvelope<{ eventId: string; transactionId: string }>>(
 		endpoint(`/api/rooms/${encodeURIComponent(roomId)}/messages/${encodeURIComponent(eventId)}/reactions`),
 		{ emoji, transactionId },
 	)
+	return response.data.data
 }
 
 export async function editMessage(roomId: string, eventId: string, body: string, transactionId: string): Promise<{ eventId: string; transactionId: string }> {
@@ -97,6 +106,13 @@ export async function setFullyRead(roomId: string, eventId: string): Promise<voi
 	await axios.post(
 		endpoint(`/api/rooms/${encodeURIComponent(roomId)}/read-marker`),
 		{ eventId },
+	)
+}
+
+export async function setTyping(roomId: string, typing: boolean): Promise<void> {
+	await axios.post(
+		endpoint(`/api/rooms/${encodeURIComponent(roomId)}/typing`),
+		{ typing },
 	)
 }
 

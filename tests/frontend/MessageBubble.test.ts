@@ -4,6 +4,7 @@ import { shallowMount } from '@vue/test-utils'
 import { defineComponent } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import MessageBubble from '../../src/components/MessageBubble.vue'
+import ReplyPreview from '../../src/components/ReplyPreview.vue'
 
 const mocks = vi.hoisted(() => {
 	const pick = vi.fn()
@@ -58,6 +59,14 @@ const MessageReferencePreviewStub = defineComponent({
 	template: '<div class="reference-preview-stub"><div class="message-slot"><slot :preview="preview" /></div><div class="widget-stub">Preview</div></div>',
 })
 
+const NcEmojiPickerStub = defineComponent({
+	props: {
+		closeOnSelect: { type: Boolean, default: false },
+	},
+	emits: ['select', 'selectData', 'unselect'],
+	template: '<div class="emoji-picker-stub"><slot /></div>',
+})
+
 describe('MessageBubble', () => {
 	function mountMessageBubble(withAttachment = false) {
 		return shallowMount(MessageBubble, {
@@ -81,6 +90,7 @@ describe('MessageBubble', () => {
 				stubs: {
 					MessageReferencePreview: MessageReferencePreviewStub,
 					MessageReferencePreviewControls: true,
+					NcEmojiPicker: NcEmojiPickerStub,
 				},
 			},
 		})
@@ -132,8 +142,170 @@ describe('MessageBubble', () => {
 		expect(actionButtons).toHaveLength(2)
 
 		await actionButtons[0].trigger('click')
-		await actionButtons[1].trigger('click')
 		expect(wrapper.emitted('reply')).toHaveLength(1)
-		expect(wrapper.emitted('react')?.[0]?.[1]).toBe('👍')
+	})
+
+	it('reacts with a picked emoji from the reaction picker', async () => {
+		const wrapper = mountMessageBubble()
+
+		await wrapper.findComponent(NcEmojiPickerStub).vm.$emit('select', '🎉')
+
+		expect(wrapper.emitted('react')?.[0]).toEqual([expect.objectContaining({ id: '$message' }), '🎉'])
+		expect(wrapper.emitted('unreact')).toBeUndefined()
+	})
+
+	it('removes an own reaction when its emoji is picked again', async () => {
+		const wrapper = shallowMount(MessageBubble, {
+			props: {
+				currentUserId: '@me:example.test',
+				message: {
+					id: '$message',
+					sender: '@me:example.test',
+					body: 'hi',
+					timestamp: 1,
+					reactions: { '👍': 1 },
+					ownReactions: [{ key: '👍', eventId: '$reaction' }],
+				},
+			},
+			global: {
+				stubs: {
+					MessageReferencePreview: MessageReferencePreviewStub,
+					MessageReferencePreviewControls: true,
+					NcEmojiPicker: NcEmojiPickerStub,
+				},
+			},
+		})
+
+		await wrapper.findComponent(NcEmojiPickerStub).vm.$emit('select', '👍')
+
+		expect(wrapper.emitted('unreact')?.[0]).toEqual([expect.objectContaining({ id: '$message' }), '👍'])
+		expect(wrapper.emitted('react')).toBeUndefined()
+	})
+
+	it('highlights the user\'s own reactions', () => {
+		const wrapper = shallowMount(MessageBubble, {
+			props: {
+				currentUserId: '@me:example.test',
+				message: {
+					id: '$message',
+					sender: '@me:example.test',
+					body: 'hi',
+					timestamp: 1,
+					reactions: { '👍': 2, '❤️': 1 },
+					ownReactions: [{ key: '👍', eventId: '$reaction' }],
+				},
+			},
+			global: {
+				stubs: {
+					MessageReferencePreview: MessageReferencePreviewStub,
+					MessageReferencePreviewControls: true,
+					NcEmojiPicker: NcEmojiPickerStub,
+				},
+			},
+		})
+
+		expect(wrapper.get('.message__reaction--own').text()).toContain('👍')
+	})
+
+	it('renders a reply preview for reply messages and forwards jumps', async () => {
+		const wrapper = shallowMount(MessageBubble, {
+			props: {
+				currentUserId: '@me:example.test',
+				message: {
+					id: '$reply',
+					sender: '@me:example.test',
+					body: 'Answer',
+					timestamp: 1,
+					relatesTo: { 'm.in_reply_to': { event_id: '$original' } },
+				},
+				replyToMessage: {
+					id: '$original',
+					sender: '@other:example.test',
+					senderName: 'Other',
+					body: 'Question',
+					timestamp: 1,
+				},
+				canJumpReply: true,
+			},
+			global: {
+				stubs: {
+					MessageReferencePreview: MessageReferencePreviewStub,
+					MessageReferencePreviewControls: true,
+				},
+			},
+		})
+
+		const preview = wrapper.findComponent(ReplyPreview)
+		expect(preview.exists()).toBe(true)
+		expect(preview.props('canJump')).toBe(true)
+
+		await preview.vm.$emit('jump')
+		expect(wrapper.emitted('jump')).toHaveLength(1)
+	})
+
+	it('does not render a reply preview without a reply relation', () => {
+		const wrapper = mountMessageBubble()
+
+		expect(wrapper.findComponent(ReplyPreview).exists()).toBe(false)
+	})
+
+	it('renders a reply preview from the body fallback when there is no relation', () => {
+		const wrapper = shallowMount(MessageBubble, {
+			props: {
+				currentUserId: '@me:example.test',
+				message: {
+					id: '$reply',
+					sender: '@me:example.test',
+					body: '> <@other:example.test> Question text\n\nAnswer',
+					timestamp: 1,
+				},
+			},
+			global: {
+				stubs: {
+					MessageReferencePreview: MessageReferencePreviewStub,
+					MessageReferencePreviewControls: true,
+				},
+			},
+		})
+
+		const preview = wrapper.findComponent(ReplyPreview)
+		expect(preview.exists()).toBe(true)
+		expect(preview.props('fallbackText')).toBe('Question text')
+		expect(preview.props('canJump')).toBe(false)
+	})
+
+	it('shows a read check on own sent messages marked as read', () => {
+		const wrapper = shallowMount(MessageBubble, {
+			props: {
+				currentUserId: '@me:example.test',
+				message: { id: '$m', sender: '@me:example.test', body: 'hi', timestamp: 1, status: 'sent' },
+				readByOther: true,
+			},
+			global: {
+				stubs: {
+					MessageReferencePreview: MessageReferencePreviewStub,
+					MessageReferencePreviewControls: true,
+				},
+			},
+		})
+
+		expect(wrapper.find('.message__read').exists()).toBe(true)
+	})
+
+	it('does not show a read check when the message is not read by the other user', () => {
+		const wrapper = shallowMount(MessageBubble, {
+			props: {
+				currentUserId: '@me:example.test',
+				message: { id: '$m', sender: '@me:example.test', body: 'hi', timestamp: 1, status: 'sent' },
+			},
+			global: {
+				stubs: {
+					MessageReferencePreview: MessageReferencePreviewStub,
+					MessageReferencePreviewControls: true,
+				},
+			},
+		})
+
+		expect(wrapper.find('.message__read').exists()).toBe(false)
 	})
 })

@@ -163,6 +163,25 @@ final class ChatGateway {
 		];
 	}
 
+	/** @return array<string,mixed> */
+	public function getMessage(string $userId, string $roomId, string $eventId): array {
+		$this->assertRoomId($roomId);
+		$this->assertEventId($eventId);
+		$matrixToken = $this->requireMatrixToken($userId);
+		$event = $this->matrix->event($matrixToken, $roomId, $eventId);
+		$memberEvents = $this->matrix->roomMembers($matrixToken, $roomId);
+		if ($memberEvents === []) {
+			$memberEvents = $this->syntheticMembersFromSenders([$event]);
+		}
+		$members = $this->roomMapper->members($memberEvents, $this->profiles($matrixToken, $memberEvents));
+		$currentMatrixUserId = $this->secrets->getMatrixUserId($userId);
+		$events = $this->roomMapper->events([$event], $members, $currentMatrixUserId);
+		if ($events === []) {
+			throw new IntegrationException('message_not_found', 'The message is not available.', 404);
+		}
+		return $events[0];
+	}
+
 	/** @return array{events:list<array<string,mixed>>} */
 	public function searchMessages(string $userId, string $roomId, string $query, int $limit = 20): array {
 		$this->assertRoomId($roomId);
@@ -275,6 +294,13 @@ final class ChatGateway {
 		} catch (IntegrationException $e) {
 			$this->logger->warning('Failed to send read receipt', ['exception' => $e]);
 		}
+	}
+
+	public function setTyping(string $userId, string $roomId, bool $typing): void {
+		$this->assertRoomId($roomId);
+		$accessToken = $this->requireMatrixToken($userId);
+		$matrixUserId = $this->secrets->getMatrixUserId($userId);
+		$this->matrix->sendTyping($accessToken, $roomId, $matrixUserId, $typing);
 	}
 
 	public function redact(string $userId, string $roomId, string $eventId): void {

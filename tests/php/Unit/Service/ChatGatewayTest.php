@@ -149,4 +149,125 @@ final class ChatGatewayTest extends TestCase {
 
 		self::assertSame('$edited:chat.church.tools', $result['eventId']);
 	}
+
+	public function testGetMessageFetchesEventAndResolvesSender(): void {
+		$gateway = $this->createMessageGateway();
+
+		$result = $gateway->getMessage('admin', '!room:chat.church.tools', '$target:chat.church.tools');
+
+		self::assertSame('$target:chat.church.tools', $result['id']);
+		self::assertSame('Anna Schmidt', $result['senderName']);
+		self::assertSame('original', $result['body']);
+	}
+
+	public function testSetTypingDelegatesTypingStateToMatrix(): void {
+		$config = $this->createMock(IConfig::class);
+		$config->method('getUserValue')->willReturnCallback(
+			static fn (string $userId, string $appId, string $key, string $default): string => match ($key) {
+				'matrix_access_token' => 'encrypted-matrix-token',
+				'matrix_user_id' => '@ct_me:chat.church.tools',
+				default => $default,
+			},
+		);
+		$crypto = $this->createMock(ICrypto::class);
+		$crypto->method('decrypt')->willReturnCallback(static fn (string $value): string => match ($value) {
+			'encrypted-matrix-token' => 'matrix-token',
+			default => '',
+		});
+		$typingResponse = $this->createMock(IResponse::class);
+		$typingResponse->method('getStatusCode')->willReturn(200);
+		$typingResponse->method('getBody')->willReturn('{}');
+		$httpClient = $this->createMock(IClient::class);
+		$httpClient->method('put')->willReturnCallback(
+			static function (string $url, array $options) use ($typingResponse): IResponse {
+				self::assertSame('https://chat.church.tools/_matrix/client/v3/rooms/%21room%3Achat.church.tools/typing/%40ct_me%3Achat.church.tools', $url);
+				self::assertSame('Bearer matrix-token', $options['headers']['Authorization']);
+				self::assertSame(['typing' => true, 'timeout' => 30000], json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR));
+				return $typingResponse;
+			},
+		);
+		$clientService = $this->createMock(IClientService::class);
+		$clientService->method('newClient')->willReturn($httpClient);
+		$appConfig = $this->createMock(\OCP\IConfig::class);
+		$appConfig->method('getAppValue')->willReturnCallback(
+			static fn (string $appId, string $key, string $default = ''): string => $key === 'churchtools_tenant_url' ? 'https://tenant.church.tools' : $default,
+		);
+		$appConfigService = new AppConfigService($appConfig, new TenantUrlValidator());
+		$matrixUserId = new MatrixUserId($appConfigService);
+
+		$gateway = new ChatGateway(
+			new SecretService($config, $crypto),
+			new ChurchToolsClient($clientService),
+			new MatrixClient($clientService, $matrixUserId, $appConfigService),
+			$matrixUserId,
+			new MatrixRoomMapper(),
+			$appConfigService,
+			$this->createMock(LoggerInterface::class),
+		);
+
+		$gateway->setTyping('admin', '!room:chat.church.tools', true);
+	}
+
+	private function createMessageGateway(): ChatGateway {
+		$config = $this->createMock(IConfig::class);
+		$config->method('getUserValue')->willReturnCallback(
+			static fn (string $userId, string $appId, string $key, string $default): string => match ($key) {
+				'matrix_access_token' => 'encrypted-matrix-token',
+				'matrix_user_id' => '@ct_me:chat.church.tools',
+				default => $default,
+			},
+		);
+		$crypto = $this->createMock(ICrypto::class);
+		$crypto->method('decrypt')->willReturnCallback(static fn (string $value): string => match ($value) {
+			'encrypted-matrix-token' => 'matrix-token',
+			default => '',
+		});
+		$eventResponse = $this->createMock(IResponse::class);
+		$eventResponse->method('getStatusCode')->willReturn(200);
+		$eventResponse->method('getBody')->willReturn(json_encode([
+			'type' => 'm.room.message',
+			'event_id' => '$target:chat.church.tools',
+			'sender' => '@ct_anna:chat.church.tools',
+			'origin_server_ts' => 1000,
+			'content' => ['msgtype' => 'm.text', 'body' => 'original'],
+		], JSON_THROW_ON_ERROR));
+		$membersResponse = $this->createMock(IResponse::class);
+		$membersResponse->method('getStatusCode')->willReturn(200);
+		$membersResponse->method('getBody')->willReturn(json_encode([
+			'chunk' => [[
+				'type' => 'm.room.member',
+				'state_key' => '@ct_anna:chat.church.tools',
+				'content' => [
+					'membership' => 'join',
+					'displayname' => 'Anna Schmidt',
+					'avatar_url' => 'mxc://chat.church.tools/anna',
+				],
+			]],
+		], JSON_THROW_ON_ERROR));
+		$httpClient = $this->createMock(IClient::class);
+		$httpClient->method('get')->willReturnCallback(
+			static function (string $url, array $options) use ($eventResponse, $membersResponse): IResponse {
+				self::assertSame('Bearer matrix-token', $options['headers']['Authorization']);
+				return str_contains($url, '/event/') ? $eventResponse : $membersResponse;
+			},
+		);
+		$clientService = $this->createMock(IClientService::class);
+		$clientService->method('newClient')->willReturn($httpClient);
+		$appConfig = $this->createMock(\OCP\IConfig::class);
+		$appConfig->method('getAppValue')->willReturnCallback(
+			static fn (string $appId, string $key, string $default = ''): string => $key === 'churchtools_tenant_url' ? 'https://tenant.church.tools' : $default,
+		);
+		$appConfigService = new AppConfigService($appConfig, new TenantUrlValidator());
+		$matrixUserId = new MatrixUserId($appConfigService);
+
+		return new ChatGateway(
+			new SecretService($config, $crypto),
+			new ChurchToolsClient($clientService),
+			new MatrixClient($clientService, $matrixUserId, $appConfigService),
+			$matrixUserId,
+			new MatrixRoomMapper(),
+			$appConfigService,
+			$this->createMock(LoggerInterface::class),
+		);
+	}
 }

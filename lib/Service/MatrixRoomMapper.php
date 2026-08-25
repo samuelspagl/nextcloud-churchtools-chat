@@ -93,6 +93,8 @@ final class MatrixRoomMapper {
 			}
 		}
 
+		$ephemeral = $this->ephemeral($room, $memberMap, $currentUserId);
+
 		return [
 			'id' => $roomId,
 			'name' => $name,
@@ -104,8 +106,108 @@ final class MatrixRoomMapper {
 			'limited' => $limited,
 			'prevBatch' => $prevBatch,
 			'fullyReadEventId' => $fullyReadEventId,
+			'typingUsers' => $ephemeral['typingUsers'],
+			'readReceipts' => $ephemeral['readReceipts'],
 			'lastMessage' => $lastMessage,
 			'events' => $messages,
+		];
+	}
+
+	/**
+	 * Matrix room alias for a ChurchTools chat, following the same derivation as
+	 * the @ct_<guid> user ids: #<prefix>_<lowercase-guid>:<server>.
+	 *
+	 * Confirmed by the D5 mapping spike on 2026-08-25: the alias resolves through
+	 * the Matrix room directory to the chat's room.
+	 */
+	public function chatRoomAlias(string $prefix, string $guid, string $server): string {
+		return '#' . strtolower($prefix) . '_' . strtolower($guid) . ':' . strtolower($server);
+	}
+
+	/**
+	 * Match ChurchTools chats to joined Matrix rooms via the confirmed alias
+	 * derivation, falling back to the room display name.
+	 *
+	 * @param list<array{creator:int|null,domainId:int,guid:string,prefix:string,roomname:string|null,status:string}> $chats
+	 * @param list<array{roomId:string,state:array<string,mixed>}> $rooms
+	 * @return list<array{chat:array<string,mixed>,roomId:string,confidence:string}>
+	 */
+	public function matchChatsToRooms(array $chats, array $rooms, string $server): array {
+		$matches = [];
+		foreach ($chats as $chat) {
+			$candidate = $this->chatRoomAlias($chat['prefix'], $chat['guid'], $server);
+			$roomId = null;
+			$confidence = 'none';
+			foreach ($rooms as $room) {
+				$state = is_array($room['state'] ?? null) ? $room['state'] : [];
+				$alias = is_array($state['m.room.canonical_alias'] ?? null) ? ($state['m.room.canonical_alias']['alias'] ?? null) : null;
+				if (is_string($alias) && $alias === $candidate) {
+					$roomId = $room['roomId'];
+					$confidence = 'alias';
+					break;
+				}
+				$name = is_array($state['m.room.name'] ?? null) ? ($state['m.room.name']['name'] ?? null) : null;
+				if ($confidence !== 'alias' && is_string($name) && $name !== '' && $name === ($chat['roomname'] ?? '')) {
+					$roomId = $room['roomId'];
+					$confidence = 'name';
+				}
+			}
+			if ($roomId !== null) {
+				$matches[] = ['chat' => $chat, 'roomId' => $roomId, 'confidence' => $confidence];
+			}
+		}
+		return $matches;
+	}
+
+	/**
+	 * Read the ephemeral room events from a sync response: typing users and public
+	 * read receipts (m.read), excluding the current user's own state.
+	 *
+	 * @param array<string,mixed> $room
+	 * @param array<string,array{id:string,displayName:string,avatarUrl:string|null,membership:string}> $memberMap
+	 * @return array{typingUsers:list<array{id:string,displayName:string}>,readReceipts:array<string,string>}
+	 */
+	private function ephemeral(array $room, array $memberMap, string $currentUserId): array {
+		$typing = [];
+		$readReceipts = [];
+		$events = is_array($room['ephemeral']['events'] ?? null) ? $room['ephemeral']['events'] : [];
+		foreach ($events as $event) {
+			if (!is_array($event) || !is_array($event['content'] ?? null)) {
+				continue;
+			}
+			$content = $event['content'];
+			$type = $event['type'] ?? '';
+			if ($type === 'm.typing') {
+				$userIds = is_array($content['user_ids'] ?? null) ? $content['user_ids'] : [];
+				foreach ($userIds as $matrixUserId) {
+					if (!is_string($matrixUserId) || $matrixUserId === '' || $matrixUserId === $currentUserId) {
+						continue;
+					}
+					$member = $memberMap[$matrixUserId] ?? null;
+					$typing[$matrixUserId] = [
+						'id' => $matrixUserId,
+						'displayName' => $member['displayName'] ?? $this->fallbackUserName($matrixUserId),
+					];
+				}
+			} elseif ($type === 'm.receipt') {
+				foreach ($content as $eventId => $receipts) {
+					if (!is_string($eventId) || !is_array($receipts)) {
+						continue;
+					}
+					$read = is_array($receipts['m.read'] ?? null) ? $receipts['m.read'] : [];
+					foreach ($read as $matrixUserId => $_details) {
+						if (!is_string($matrixUserId) || $matrixUserId === '' || $matrixUserId === $currentUserId) {
+							continue;
+						}
+						// The last receipt for a user marks the newest event they have read.
+						$readReceipts[$matrixUserId] = $eventId;
+					}
+				}
+			}
+		}
+		return [
+			'typingUsers' => array_values($typing),
+			'readReceipts' => $readReceipts,
 		];
 	}
 
@@ -121,6 +223,7 @@ final class MatrixRoomMapper {
 		}
 		$replacements = [];
 		$reactions = [];
+		$ownReactions = [];
 		foreach ($events as $event) {
 			if (!is_array($event)) {
 				continue;
@@ -136,6 +239,12 @@ final class MatrixRoomMapper {
 				$key = (string)($relation['key'] ?? '');
 				if ($key !== '') {
 					$reactions[$target][$key] = (int)($reactions[$target][$key] ?? 0) + 1;
+					if ($currentUserId !== null && ($event['sender'] ?? '') === $currentUserId) {
+						$ownReactions[$target][] = [
+							'key' => $key,
+							'eventId' => (string)($event['event_id'] ?? ''),
+						];
+					}
 				}
 			}
 		}
@@ -174,17 +283,22 @@ final class MatrixRoomMapper {
 			if ($msgtype !== 'm.text' && $attachment === null) {
 				continue;
 			}
+			$body = (string)($replacements[$eventId] ?? $content['body'] ?? '');
+			if (isset($relation['m.in_reply_to']) && is_array($relation['m.in_reply_to'])) {
+				$body = $this->stripReplyFallback($body);
+			}
 			$normalized[] = [
 				'id' => $eventId,
 				'sender' => $sender,
 				'senderName' => $member['displayName'] ?? $this->fallbackUserName($sender),
 				'senderAvatarUrl' => $member['avatarUrl'] ?? null,
-				'body' => (string)($replacements[$eventId] ?? $content['body'] ?? ''),
+				'body' => $body,
 				'timestamp' => (int)($event['origin_server_ts'] ?? 0),
 				'edited' => isset($replacements[$eventId]),
 				'mentionsMe' => $mentionsMe,
 				'relatesTo' => $relation !== [] ? $relation : null,
 				'reactions' => $reactions[$eventId] ?? [],
+				'ownReactions' => $ownReactions[$eventId] ?? [],
 				'attachment' => $attachment,
 			];
 		}
@@ -298,5 +412,30 @@ final class MatrixRoomMapper {
 		$localpart = preg_replace('/^ct_/', '', $localpart) ?? $localpart;
 		$readable = trim(str_replace(['_', '-'], ' ', $localpart));
 		return $readable !== '' ? $readable : 'Unknown user';
+	}
+
+	/**
+	 * Strip the Matrix rich-reply fallback from a message body: the leading block of
+	 * "> " quoted lines (and a single blank separator line) that clients include when
+	 * sending an m.in_reply_to message. The remaining text is the actual reply.
+	 */
+	private function stripReplyFallback(string $body): string {
+		$lines = preg_split('/\R/', $body);
+		if ($lines === false || $lines === []) {
+			return $body;
+		}
+		$index = 0;
+		$stripped = 0;
+		while (isset($lines[$index]) && str_starts_with($lines[$index], '>')) {
+			$index++;
+			$stripped++;
+		}
+		if ($stripped === 0) {
+			return $body;
+		}
+		if (isset($lines[$index]) && trim($lines[$index]) === '') {
+			$index++;
+		}
+		return trim(implode("\n", array_slice($lines, $index)));
 	}
 }

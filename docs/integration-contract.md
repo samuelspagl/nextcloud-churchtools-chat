@@ -34,6 +34,70 @@ The OpenAPI also documents creating, changing and deleting chat metadata, and
 starting/stopping group or event chats. This app does not invoke those mutating
 operations in its initial release.
 
+### Chat metadata (`GET /api/chat`)
+
+Verified against the tenant OpenAPI (`/system/runtime/swagger/openapi.json`)
+on 2026-08-25. Each entry is:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `creator` | `int`\|`null` | Person ID that created the chat |
+| `domainId` | `int` | ChurchTools entity the chat belongs to (group, event, ...) |
+| `guid` | `string` | Chat-specific GUID, e.g. `681F54E3-2EB7-40A4-84F0-EFF8E8F05727` |
+| `prefix` | `string` | Chat key/prefix, e.g. `ctg` ("ct group") |
+| `roomname` | `string`\|`null` | Display name, e.g. `Technik` |
+| `status` | `string` | `NOT_STARTED` \| `STARTED` \| `STARTING` \| `STOPPED` |
+
+OpenAPI example:
+
+```json
+{
+  "creator": 1,
+  "domainId": 9,
+  "guid": "681F54E3-2EB7-40A4-84F0-EFF8E8F05727",
+  "prefix": "ctg",
+  "roomname": "Technik",
+  "status": "STARTED"
+}
+```
+
+Related endpoints:
+
+- `POST /api/chat` creates chat metadata (`domainId`, `guid`, `prefix`, `roomname`).
+- `PATCH /api/chat/{guid}` and `DELETE /api/chat/{guid}` update/remove it.
+- `POST /groups/{groupId}/chat` and `POST /events/{eventId}/chat` start or stop a
+  chat with `{ "enabled": bool, "triggerChatInviteMail": bool }`; the server
+  generates the `guid`, `prefix` and `roomname` itself.
+
+### CT chat -> Matrix room mapping (D5 spike, confirmed)
+
+The OpenAPI does not expose any Matrix room identifier, alias, or state event for
+a chat. The mapping was confirmed empirically on 2026-08-25 via
+`occ churchtools_chat:probe`: each candidate alias below resolved through the
+Matrix room directory to a real room id.
+
+The Matrix room for a ChurchTools chat is addressed by a canonical alias derived
+from the chat `prefix` and GUID, analogous to the `@ct_<guid>` user-id derivation:
+
+```text
+#<prefix>_<lowercase-guid>:<matrix-server-name>
+#cte_59049027-6296-47d5-9085-affc76ada326:chat.church.tools
+  -> !WOPBtHRquRdJWSPHIM:chat.church.tools
+```
+
+Observed chat `prefix` values (determine the chat type, see D6):
+
+| Prefix | Type |
+|---|---|
+| `cte` | event chat (`domainId` = event id, `roomname` = event title) |
+| `ctg` | group chat (from the OpenAPI example; `domainId` = group id) |
+| `cta` | announcement chat (expected; to be confirmed with live data) |
+
+Other observations: a `creator` of `-4` marks chats created by the ChurchTools
+system. `/api/chat` lists chats the person is involved in even when they are not
+(yet) a member of the Matrix room; the room can be found by resolving the alias
+without joining.
+
 The published OpenAPI does **not** expose message events or a Matrix
 token-exchange/bootstrap endpoint. Those capabilities must not be invented from
 private web endpoints.

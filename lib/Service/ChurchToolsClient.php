@@ -32,13 +32,39 @@ final class ChurchToolsClient {
 	}
 
 	/** @return list<array<string,mixed>> */
-	public function getChats(string $tenantUrl, string $token): array {
+	public function getChatsRaw(string $tenantUrl, string $token): array {
 		$payload = $this->request($tenantUrl, $token, '/api/chat');
 		$data = $payload['data'] ?? [];
 		if (!is_array($data)) {
 			throw new IntegrationException('invalid_chat_response', 'ChurchTools returned an invalid chat list.', 502);
 		}
 		return array_is_list($data) ? $data : [$data];
+	}
+
+	/** @return list<array{creator:int|null,domainId:int,guid:string,prefix:string,roomname:string|null,status:string}> */
+	public function getChats(string $tenantUrl, string $token): array {
+		$chats = [];
+		foreach ($this->getChatsRaw($tenantUrl, $token) as $item) {
+			if (!is_array($item)) {
+				continue;
+			}
+			$guid = (string)($item['guid'] ?? '');
+			$prefix = (string)($item['prefix'] ?? '');
+			$domainId = (int)($item['domainId'] ?? 0);
+			if ($guid === '' || $prefix === '' || $domainId <= 0) {
+				continue;
+			}
+			$roomname = $item['roomname'] ?? null;
+			$chats[] = [
+				'creator' => isset($item['creator']) && is_int($item['creator']) ? $item['creator'] : null,
+				'domainId' => $domainId,
+				'guid' => $guid,
+				'prefix' => $prefix,
+				'roomname' => is_string($roomname) && $roomname !== '' ? $roomname : null,
+				'status' => (string)($item['status'] ?? 'NOT_STARTED'),
+			];
+		}
+		return $chats;
 	}
 
 	/** @return list<array{id:int,guid:string,displayName:string,imageUrl:string|null,info:string}> */

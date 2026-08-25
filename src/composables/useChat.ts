@@ -1,9 +1,10 @@
-import { computed, onBeforeUnmount, onMounted, readonly, ref, shallowRef } from 'vue'
+import { computed, onBeforeUnmount, onMounted, readonly, ref, shallowRef, watch } from 'vue'
 import { showError } from '@nextcloud/dialogs'
 import {
 	getErrorCode,
 	getErrorMessage,
 	getErrorValue,
+	getEvent,
 	getMessages,
 	getRoomDetails,
 	getRooms,
@@ -15,16 +16,27 @@ import {
 	searchRoomMessages as searchRoomMessagesRequest,
 	sendMessage,
 	setFullyRead,
+	setTyping as setTypingRequest,
 	startDirectChat as startDirectChatRequest,
 	syncRooms,
 } from '../services/chatApi'
 import type { ChatMessage, ChatRoom, ChatStatus, ConversationSearchResult, PersonSearchResult, RoomDetails } from '../types/chat'
 import { mergeRooms } from '../utils/rooms'
 import { backoffDelay } from '../utils/backoff'
-import { buildReplyRelation } from '../utils/relations'
+import { buildReplyRelation, getReplyTargetId } from '../utils/relations'
 
 function transactionId(): string {
 	return `nc-${crypto.randomUUID()}`
+}
+
+function removeReaction(reactions: Record<string, number> | undefined, emoji: string): Record<string, number> {
+	const next = { ...(reactions ?? {}) }
+	if ((next[emoji] ?? 0) <= 1) {
+		delete next[emoji]
+	} else {
+		next[emoji] -= 1
+	}
+	return next
 }
 
 export function useChat() {
@@ -51,6 +63,8 @@ export function useChat() {
 	const focusedMessageId = shallowRef<string | null>(null)
 	const nextBatch = shallowRef<string | undefined>()
 	const sessionExpired = shallowRef(false)
+	const replyTargets = shallowRef<Record<string, ChatMessage>>({})
+	const pendingReplyTargets = new Set<string>()
 	let stopped = false
 	let personSearchSequence = 0
 	let conversationSearchSequence = 0
@@ -185,12 +199,36 @@ export function useChat() {
 	async function react(message: ChatMessage, emoji: string) {
 		const roomId = activeRoomId.value
 		if (!roomId || message.id.startsWith('nc-')) return
-		await reactToMessage(roomId, message.id, emoji, transactionId())
+		const result = await reactToMessage(roomId, message.id, emoji, transactionId())
 		rooms.value = rooms.value.map((room) => room.id === roomId
 			? {
 				...room,
 				events: room.events.map((event) => event.id === message.id
-					? { ...event, reactions: { ...event.reactions, [emoji]: (event.reactions?.[emoji] ?? 0) + 1 } }
+					? {
+						...event,
+						reactions: { ...event.reactions, [emoji]: (event.reactions?.[emoji] ?? 0) + 1 },
+						ownReactions: [...(event.ownReactions ?? []), { key: emoji, eventId: result.eventId }],
+					}
+					: event),
+			}
+			: room)
+	}
+
+	async function unreact(message: ChatMessage, emoji: string) {
+		const roomId = activeRoomId.value
+		if (!roomId || message.id.startsWith('nc-')) return
+		const own = message.ownReactions?.find((reaction) => reaction.key === emoji)
+		if (!own) return
+		await deleteMessageRequest(roomId, own.eventId)
+		rooms.value = rooms.value.map((room) => room.id === roomId
+			? {
+				...room,
+				events: room.events.map((event) => event.id === message.id
+					? {
+						...event,
+						reactions: removeReaction(event.reactions, emoji),
+						ownReactions: (event.ownReactions ?? []).filter((reaction) => reaction.key !== emoji),
+					}
 					: event),
 			}
 			: room)
@@ -355,6 +393,46 @@ export function useChat() {
 		focusTimer = window.setTimeout(() => { focusedMessageId.value = null }, 2200)
 	}
 
+	async function fetchReplyTarget(roomId: string, eventId: string) {
+		if (pendingReplyTargets.has(eventId) || replyTargets.value[eventId]) return
+		pendingReplyTargets.add(eventId)
+		try {
+			const target = await getEvent(roomId, eventId)
+			replyTargets.value = { ...replyTargets.value, [eventId]: target }
+		} catch {
+			// Leave the reply target unresolved; the timeline renders a placeholder.
+		} finally {
+			pendingReplyTargets.delete(eventId)
+		}
+	}
+
+	watch(activeRoomId, () => {
+		replyTargets.value = {}
+		pendingReplyTargets.clear()
+	})
+
+	watch(messages, (list) => {
+		const roomId = activeRoomId.value
+		if (!roomId) return
+		const loadedIds = new Set(list.map((message) => message.id))
+		for (const message of list) {
+			const targetId = getReplyTargetId(message)
+			if (targetId !== null && !loadedIds.has(targetId) && !replyTargets.value[targetId]) {
+				void fetchReplyTarget(roomId, targetId)
+			}
+		}
+	}, { immediate: true })
+
+	async function setTyping(typing: boolean) {
+		const roomId = activeRoomId.value
+		if (!roomId) return
+		try {
+			await setTypingRequest(roomId, typing)
+		} catch {
+			// Typing state is ephemeral and best-effort; ignore failures.
+		}
+	}
+
 	async function startDirectChat(person: PersonSearchResult) {
 		startingPersonId.value = person.id
 		personSearchError.value = ''
@@ -505,6 +583,7 @@ export function useChat() {
 		searchingMessages: readonly(searchingMessages),
 		messageSearchError: readonly(messageSearchError),
 		focusedMessageId: readonly(focusedMessageId),
+		replyTargets: readonly(replyTargets),
 		selectRoom,
 		loadOlderMessages,
 		searchPersons,
@@ -516,8 +595,10 @@ export function useChat() {
 		focusMessage,
 		startDirectChat,
 		send,
+		setTyping,
 		retry,
 		react,
+		unreact,
 		deleteMessage,
 		toggleDetails,
 		closeDetails,
