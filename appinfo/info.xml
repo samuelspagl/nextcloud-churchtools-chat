@@ -22,6 +22,9 @@
         <php min-version="8.1"/>
         <nextcloud min-version="31" max-version="34"/>
     </dependencies>
+    <commands>
+        <command>OCA\ChurchToolsChat\Command\ProbeCommand</command>
+    </commands>
     <navigations>
         <navigation>
             <name>ChurchTools Chat</name>

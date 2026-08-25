@@ -34,6 +34,59 @@ The OpenAPI also documents creating, changing and deleting chat metadata, and
 starting/stopping group or event chats. This app does not invoke those mutating
 operations in its initial release.
 
+### Chat metadata (`GET /api/chat`)
+
+Verified against the tenant OpenAPI (`/system/runtime/swagger/openapi.json`)
+on 2026-08-25. Each entry is:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `creator` | `int`\|`null` | Person ID that created the chat |
+| `domainId` | `int` | ChurchTools entity the chat belongs to (group, event, ...) |
+| `guid` | `string` | Chat-specific GUID, e.g. `681F54E3-2EB7-40A4-84F0-EFF8E8F05727` |
+| `prefix` | `string` | Chat key/prefix, e.g. `ctg` ("ct group") |
+| `roomname` | `string`\|`null` | Display name, e.g. `Technik` |
+| `status` | `string` | `NOT_STARTED` \| `STARTED` \| `STARTING` \| `STOPPED` |
+
+OpenAPI example:
+
+```json
+{
+  "creator": 1,
+  "domainId": 9,
+  "guid": "681F54E3-2EB7-40A4-84F0-EFF8E8F05727",
+  "prefix": "ctg",
+  "roomname": "Technik",
+  "status": "STARTED"
+}
+```
+
+Related endpoints:
+
+- `POST /api/chat` creates chat metadata (`domainId`, `guid`, `prefix`, `roomname`).
+- `PATCH /api/chat/{guid}` and `DELETE /api/chat/{guid}` update/remove it.
+- `POST /groups/{groupId}/chat` and `POST /events/{eventId}/chat` start or stop a
+  chat with `{ "enabled": bool, "triggerChatInviteMail": bool }`; the server
+  generates the `guid`, `prefix` and `roomname` itself.
+
+### CT chat -> Matrix room mapping (D5 spike)
+
+The OpenAPI does not expose any Matrix room identifier, alias, or state event for
+a chat. The exact room mapping therefore has to be verified empirically.
+
+Working hypothesis (to confirm via `occ churchtools_chat:probe`): the Matrix room
+is addressed through a canonical alias derived from the chat `prefix` and GUID,
+analogous to the `@ct_<guid>` user-id derivation:
+
+```text
+#<prefix>_<lowercase-guid>:<matrix-server-name>
+#ctg_681f54e3-2eb7-40a4-84f0-eff8e8f05727:chat.church.tools
+```
+
+The mapping may instead be carried by the room's `m.room.name` (`roomname`) or a
+custom state event holding the `domainId`/`guid`. Until confirmed, the app must
+not rely on a single formula.
+
 The published OpenAPI does **not** expose message events or a Matrix
 token-exchange/bootstrap endpoint. Those capabilities must not be invented from
 private web endpoints.

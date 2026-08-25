@@ -6,6 +6,10 @@ All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
 ### Added
 
+- D5 spike groundwork: the ChurchTools `/api/chat` contract is documented and its
+  response is now parsed into a typed model. A `churchtools_chat:probe` occ command
+  dumps the raw chat metadata and the joined Matrix rooms side by side so the exact
+  CT chat -> room mapping can be confirmed.
 - Emoji picker in the composer: a smiley button between the "+" menu and the text
   editor opens the Nextcloud emoji picker and inserts the selected emoji at the
   cursor position.

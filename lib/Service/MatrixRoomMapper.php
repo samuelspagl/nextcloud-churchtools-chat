@@ -114,6 +114,53 @@ final class MatrixRoomMapper {
 	}
 
 	/**
+	 * Candidate Matrix room alias for a ChurchTools chat, following the same
+	 * derivation as the @ct_<guid> user ids: #<prefix>_<lowercase-guid>:<server>.
+	 *
+	 * This is a working hypothesis of the D5 mapping spike and must be confirmed
+	 * against a live tenant before the app relies on it.
+	 */
+	public function chatRoomAlias(string $prefix, string $guid, string $server): string {
+		return '#' . strtolower($prefix) . '_' . strtolower($guid) . ':' . strtolower($server);
+	}
+
+	/**
+	 * Heuristically match ChurchTools chats to joined Matrix rooms until the exact
+	 * mapping is confirmed. Rooms use the shape produced by the D5 probe
+	 * (roomId + extracted state events).
+	 *
+	 * @param list<array{creator:int|null,domainId:int,guid:string,prefix:string,roomname:string|null,status:string}> $chats
+	 * @param list<array{roomId:string,state:array<string,mixed>}> $rooms
+	 * @return list<array{chat:array<string,mixed>,roomId:string,confidence:string}>
+	 */
+	public function matchChatsToRooms(array $chats, array $rooms, string $server): array {
+		$matches = [];
+		foreach ($chats as $chat) {
+			$candidate = $this->chatRoomAlias($chat['prefix'], $chat['guid'], $server);
+			$roomId = null;
+			$confidence = 'none';
+			foreach ($rooms as $room) {
+				$state = is_array($room['state'] ?? null) ? $room['state'] : [];
+				$alias = is_array($state['m.room.canonical_alias'] ?? null) ? ($state['m.room.canonical_alias']['alias'] ?? null) : null;
+				if (is_string($alias) && $alias === $candidate) {
+					$roomId = $room['roomId'];
+					$confidence = 'alias';
+					break;
+				}
+				$name = is_array($state['m.room.name'] ?? null) ? ($state['m.room.name']['name'] ?? null) : null;
+				if ($confidence !== 'alias' && is_string($name) && $name !== '' && $name === ($chat['roomname'] ?? '')) {
+					$roomId = $room['roomId'];
+					$confidence = 'name';
+				}
+			}
+			if ($roomId !== null) {
+				$matches[] = ['chat' => $chat, 'roomId' => $roomId, 'confidence' => $confidence];
+			}
+		}
+		return $matches;
+	}
+
+	/**
 	 * Read the ephemeral room events from a sync response: typing users and public
 	 * read receipts (m.read), excluding the current user's own state.
 	 *

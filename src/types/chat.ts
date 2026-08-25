@@ -87,10 +87,19 @@ export interface RoomDetails {
 	members: readonly RoomMember[]
 }
 
+export interface ChurchToolsChat {
+	creator: number | null
+	domainId: number
+	guid: string
+	prefix: string
+	roomname: string | null
+	status: 'NOT_STARTED' | 'STARTED' | 'STARTING' | 'STOPPED'
+}
+
 export interface RoomsResponse {
 	rooms: ChatRoom[]
 	nextBatch: string | null
-	churchToolsChats: Array<Record<string, unknown>>
+	churchToolsChats: ChurchToolsChat[]
 }
 
 export interface MessagesResponse {

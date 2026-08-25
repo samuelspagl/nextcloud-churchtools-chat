@@ -178,6 +178,36 @@ final class MatrixRoomMapperTest extends TestCase {
 		self::assertSame([], $room['readReceipts']);
 	}
 
+	public function testChatRoomAliasFollowsUserDerivation(): void {
+		self::assertSame(
+			'#ctg_681f54e3-2eb7-40a4-84f0-eff8e8f05727:chat.church.tools',
+			$this->mapper->chatRoomAlias('ctg', '681F54E3-2EB7-40A4-84F0-EFF8E8F05727', 'chat.church.tools'),
+		);
+	}
+
+	public function testMatchChatsToRoomsByAliasAndName(): void {
+		$chats = [
+			['creator' => null, 'domainId' => 9, 'guid' => '681F54E3-2EB7-40A4-84F0-EFF8E8F05727', 'prefix' => 'ctg', 'roomname' => 'Technik', 'status' => 'STARTED'],
+			['creator' => null, 'domainId' => 10, 'guid' => 'AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE', 'prefix' => 'cte', 'roomname' => 'Event ABC', 'status' => 'STARTED'],
+		];
+		$rooms = [
+			['roomId' => '!byAlias:test', 'state' => [
+				'm.room.canonical_alias' => ['alias' => '#ctg_681f54e3-2eb7-40a4-84f0-eff8e8f05727:chat.church.tools'],
+			]],
+			['roomId' => '!byName:test', 'state' => [
+				'm.room.name' => ['name' => 'Event ABC'],
+			]],
+		];
+
+		$matches = $this->mapper->matchChatsToRooms($chats, $rooms, 'chat.church.tools');
+
+		self::assertCount(2, $matches);
+		self::assertSame('!byAlias:test', $matches[0]['roomId']);
+		self::assertSame('alias', $matches[0]['confidence']);
+		self::assertSame('!byName:test', $matches[1]['roomId']);
+		self::assertSame('name', $matches[1]['confidence']);
+	}
+
 	public function testEditReplacesBodyAndMarksMessageAsEdited(): void {
 		$members = $this->mapper->members([$this->member('@ct_anna:chat.church.tools', 'Anna Schmidt')]);
 		$events = [
