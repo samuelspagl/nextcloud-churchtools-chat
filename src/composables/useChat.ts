@@ -29,6 +29,16 @@ function transactionId(): string {
 	return `nc-${crypto.randomUUID()}`
 }
 
+function removeReaction(reactions: Record<string, number> | undefined, emoji: string): Record<string, number> {
+	const next = { ...(reactions ?? {}) }
+	if ((next[emoji] ?? 0) <= 1) {
+		delete next[emoji]
+	} else {
+		next[emoji] -= 1
+	}
+	return next
+}
+
 export function useChat() {
 	const status = shallowRef<ChatStatus | null>(null)
 	const rooms = ref<ChatRoom[]>([])
@@ -189,12 +199,36 @@ export function useChat() {
 	async function react(message: ChatMessage, emoji: string) {
 		const roomId = activeRoomId.value
 		if (!roomId || message.id.startsWith('nc-')) return
-		await reactToMessage(roomId, message.id, emoji, transactionId())
+		const result = await reactToMessage(roomId, message.id, emoji, transactionId())
 		rooms.value = rooms.value.map((room) => room.id === roomId
 			? {
 				...room,
 				events: room.events.map((event) => event.id === message.id
-					? { ...event, reactions: { ...event.reactions, [emoji]: (event.reactions?.[emoji] ?? 0) + 1 } }
+					? {
+						...event,
+						reactions: { ...event.reactions, [emoji]: (event.reactions?.[emoji] ?? 0) + 1 },
+						ownReactions: [...(event.ownReactions ?? []), { key: emoji, eventId: result.eventId }],
+					}
+					: event),
+			}
+			: room)
+	}
+
+	async function unreact(message: ChatMessage, emoji: string) {
+		const roomId = activeRoomId.value
+		if (!roomId || message.id.startsWith('nc-')) return
+		const own = message.ownReactions?.find((reaction) => reaction.key === emoji)
+		if (!own) return
+		await deleteMessageRequest(roomId, own.eventId)
+		rooms.value = rooms.value.map((room) => room.id === roomId
+			? {
+				...room,
+				events: room.events.map((event) => event.id === message.id
+					? {
+						...event,
+						reactions: removeReaction(event.reactions, emoji),
+						ownReactions: (event.ownReactions ?? []).filter((reaction) => reaction.key !== emoji),
+					}
 					: event),
 			}
 			: room)
@@ -564,6 +598,7 @@ export function useChat() {
 		setTyping,
 		retry,
 		react,
+		unreact,
 		deleteMessage,
 		toggleDetails,
 		closeDetails,

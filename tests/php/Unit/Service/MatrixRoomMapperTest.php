@@ -185,6 +185,33 @@ final class MatrixRoomMapperTest extends TestCase {
 		);
 	}
 
+	public function testTracksOwnReactionsWithEventIds(): void {
+		$events = [
+			['type' => 'm.room.message', 'event_id' => '$msg', 'sender' => '@ct_anna:chat.church.tools', 'origin_server_ts' => 1, 'content' => ['msgtype' => 'm.text', 'body' => 'hello']],
+			['type' => 'm.reaction', 'event_id' => '$r1', 'sender' => '@ct_me:chat.church.tools', 'origin_server_ts' => 2, 'content' => ['m.relates_to' => ['rel_type' => 'm.annotation', 'event_id' => '$msg', 'key' => '👍']]],
+			['type' => 'm.reaction', 'event_id' => '$r2', 'sender' => '@ct_anna:chat.church.tools', 'origin_server_ts' => 3, 'content' => ['m.relates_to' => ['rel_type' => 'm.annotation', 'event_id' => '$msg', 'key' => '👍']]],
+			['type' => 'm.reaction', 'event_id' => '$r3', 'sender' => '@ct_anna:chat.church.tools', 'origin_server_ts' => 4, 'content' => ['m.relates_to' => ['rel_type' => 'm.annotation', 'event_id' => '$msg', 'key' => '❤️']]],
+		];
+
+		$messages = $this->mapper->events($events, [], '@ct_me:chat.church.tools');
+
+		self::assertCount(1, $messages);
+		self::assertSame(['👍' => 2, '❤️' => 1], $messages[0]['reactions']);
+		self::assertSame([['key' => '👍', 'eventId' => '$r1']], $messages[0]['ownReactions']);
+	}
+
+	public function testOwnReactionsAreEmptyWithoutCurrentUser(): void {
+		$events = [
+			['type' => 'm.room.message', 'event_id' => '$msg', 'sender' => '@ct_anna:chat.church.tools', 'origin_server_ts' => 1, 'content' => ['msgtype' => 'm.text', 'body' => 'hello']],
+			['type' => 'm.reaction', 'event_id' => '$r1', 'sender' => '@ct_anna:chat.church.tools', 'origin_server_ts' => 2, 'content' => ['m.relates_to' => ['rel_type' => 'm.annotation', 'event_id' => '$msg', 'key' => '👍']]],
+		];
+
+		$messages = $this->mapper->events($events, []);
+
+		self::assertSame([], $messages[0]['ownReactions']);
+		self::assertSame(['👍' => 1], $messages[0]['reactions']);
+	}
+
 	public function testMatchChatsToRoomsByAliasAndName(): void {
 		$chats = [
 			['creator' => null, 'domainId' => 9, 'guid' => '681F54E3-2EB7-40A4-84F0-EFF8E8F05727', 'prefix' => 'ctg', 'roomname' => 'Technik', 'status' => 'STARTED'],

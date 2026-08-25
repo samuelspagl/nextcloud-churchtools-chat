@@ -59,6 +59,14 @@ const MessageReferencePreviewStub = defineComponent({
 	template: '<div class="reference-preview-stub"><div class="message-slot"><slot :preview="preview" /></div><div class="widget-stub">Preview</div></div>',
 })
 
+const NcEmojiPickerStub = defineComponent({
+	props: {
+		closeOnSelect: { type: Boolean, default: false },
+	},
+	emits: ['select', 'selectData', 'unselect'],
+	template: '<div class="emoji-picker-stub"><slot /></div>',
+})
+
 describe('MessageBubble', () => {
 	function mountMessageBubble(withAttachment = false) {
 		return shallowMount(MessageBubble, {
@@ -82,6 +90,7 @@ describe('MessageBubble', () => {
 				stubs: {
 					MessageReferencePreview: MessageReferencePreviewStub,
 					MessageReferencePreviewControls: true,
+					NcEmojiPicker: NcEmojiPickerStub,
 				},
 			},
 		})
@@ -133,9 +142,69 @@ describe('MessageBubble', () => {
 		expect(actionButtons).toHaveLength(2)
 
 		await actionButtons[0].trigger('click')
-		await actionButtons[1].trigger('click')
 		expect(wrapper.emitted('reply')).toHaveLength(1)
-		expect(wrapper.emitted('react')?.[0]?.[1]).toBe('👍')
+	})
+
+	it('reacts with a picked emoji from the reaction picker', async () => {
+		const wrapper = mountMessageBubble()
+
+		await wrapper.findComponent(NcEmojiPickerStub).vm.$emit('select', '🎉')
+
+		expect(wrapper.emitted('react')?.[0]).toEqual([expect.objectContaining({ id: '$message' }), '🎉'])
+		expect(wrapper.emitted('unreact')).toBeUndefined()
+	})
+
+	it('removes an own reaction when its emoji is picked again', async () => {
+		const wrapper = shallowMount(MessageBubble, {
+			props: {
+				currentUserId: '@me:example.test',
+				message: {
+					id: '$message',
+					sender: '@me:example.test',
+					body: 'hi',
+					timestamp: 1,
+					reactions: { '👍': 1 },
+					ownReactions: [{ key: '👍', eventId: '$reaction' }],
+				},
+			},
+			global: {
+				stubs: {
+					MessageReferencePreview: MessageReferencePreviewStub,
+					MessageReferencePreviewControls: true,
+					NcEmojiPicker: NcEmojiPickerStub,
+				},
+			},
+		})
+
+		await wrapper.findComponent(NcEmojiPickerStub).vm.$emit('select', '👍')
+
+		expect(wrapper.emitted('unreact')?.[0]).toEqual([expect.objectContaining({ id: '$message' }), '👍'])
+		expect(wrapper.emitted('react')).toBeUndefined()
+	})
+
+	it('highlights the user\'s own reactions', () => {
+		const wrapper = shallowMount(MessageBubble, {
+			props: {
+				currentUserId: '@me:example.test',
+				message: {
+					id: '$message',
+					sender: '@me:example.test',
+					body: 'hi',
+					timestamp: 1,
+					reactions: { '👍': 2, '❤️': 1 },
+					ownReactions: [{ key: '👍', eventId: '$reaction' }],
+				},
+			},
+			global: {
+				stubs: {
+					MessageReferencePreview: MessageReferencePreviewStub,
+					MessageReferencePreviewControls: true,
+					NcEmojiPicker: NcEmojiPickerStub,
+				},
+			},
+		})
+
+		expect(wrapper.get('.message__reaction--own').text()).toContain('👍')
 	})
 
 	it('renders a reply preview for reply messages and forwards jumps', async () => {

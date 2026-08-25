@@ -51,6 +51,7 @@ const {
 	setTyping,
 	retry,
 	react,
+	unreact,
 	deleteMessage,
 	loadOlderMessages,
 	toggleDetails,
@@ -150,6 +151,14 @@ async function reactToMessage(message: ChatMessage, emoji: string) {
 	}
 }
 
+async function unreactToMessage(message: ChatMessage, emoji: string) {
+	try {
+		await unreact(message, emoji)
+	} catch {
+		// The next sync reconciles reactions if the optimistic update cannot be applied.
+	}
+}
+
 async function retryMessage(message: ChatMessage) {
 	try {
 		await retry(message)
@@ -223,6 +232,7 @@ async function retryMessage(message: ChatMessage) {
 						@retry="retryMessage"
 						@reply="replyTarget = $event"
 						@react="reactToMessage"
+						@unreact="unreactToMessage"
 						@delete="deleteMessage"
 						@jump="focusMessage" />
 					<MessageComposer

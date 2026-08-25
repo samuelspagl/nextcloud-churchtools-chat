@@ -2,6 +2,14 @@
 
 All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
+## [0.6.2]
+
+### Added
+
+- Reactions: choose any emoji from the picker in the message actions, toggle a
+  reaction on the reaction chips, and highlight your own reactions. Your own
+  reactions can be removed again (un-react).
+
 ## [0.6.1]
 
 ### Added

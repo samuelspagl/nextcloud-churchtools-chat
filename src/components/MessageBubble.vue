@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import NcAvatar from '@nextcloud/vue/components/NcAvatar'
 import NcButton from '@nextcloud/vue/components/NcButton'
+import NcEmojiPicker from '@nextcloud/vue/components/NcEmojiPicker'
 import NcIconSvgWrapper from '@nextcloud/vue/components/NcIconSvgWrapper'
 import NcRichText from '@nextcloud/vue/components/NcRichText'
 import { FilePickerClosed, getFilePickerBuilder, showError, showSuccess } from '@nextcloud/dialogs'
@@ -32,6 +33,7 @@ const emit = defineEmits<{
 	retry: [message: ChatMessage]
 	reply: [message: ChatMessage]
 	react: [message: ChatMessage, emoji: string]
+	unreact: [message: ChatMessage, emoji: string]
 	delete: [message: ChatMessage]
 	jump: []
 }>()
@@ -45,6 +47,18 @@ const replyFallbackText = computed(() =>
 	hasReply.value ? getReplyFallbackQuote(props.message) : null)
 const savingAttachment = shallowRef(false)
 
+function isOwnReaction(emoji: string): boolean {
+	return props.message.ownReactions?.some((reaction) => reaction.key === emoji) ?? false
+}
+
+function toggleReaction(emoji: string) {
+	if (isOwnReaction(emoji)) {
+		emit('unreact', props.message, emoji)
+	} else {
+		emit('react', props.message, emoji)
+	}
+}
+
 const formattedTime = computed(() => new Intl.DateTimeFormat(undefined, {
 	hour: '2-digit',
 	minute: '2-digit',
@@ -57,6 +71,7 @@ const saveIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h12l4
 const downloadIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3h2v10.2l3.6-3.6L18 11l-6 6-6-6 1.4-1.4 3.6 3.6V3ZM5 19h14v2H5v-2Z"/></svg>'
 const deleteIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v1H4v2h16V4h-5V3H9Zm-3 5 1 12h10l1-12H6Z"/></svg>'
 const readIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7Zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l10.59-10.59L22.24 5.59ZM.41 13.41 6 19l1.41-1.41L1.83 12 .41 13.41Z"/></svg>'
+const reactIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-3.5-9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm7 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM12 17.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5Z"/></svg>'
 
 function downloadAttachment() {
 	const attachment = props.message.attachment
@@ -148,13 +163,16 @@ async function saveToNextcloud() {
 								@click="downloadAttachment">
 								<template #icon><NcIconSvgWrapper :svg="downloadIcon" /></template>
 							</NcButton>
-							<NcButton
-								variant="tertiary"
-								:aria-label="t('churchtools_chat', 'React with thumbs up')"
-								:title="t('churchtools_chat', 'React with thumbs up')"
-								@click="emit('react', message, '👍')">
-								<span aria-hidden="true">👍</span>
-							</NcButton>
+							<NcEmojiPicker :close-on-select="true" @select="toggleReaction">
+								<NcButton
+									variant="tertiary"
+									:aria-label="t('churchtools_chat', 'React')"
+									:title="t('churchtools_chat', 'React')">
+									<template #icon>
+										<NcIconSvgWrapper :svg="reactIcon" />
+									</template>
+								</NcButton>
+							</NcEmojiPicker>
 							<NcButton
 								v-if="canDelete"
 								variant="tertiary"
@@ -166,7 +184,17 @@ async function saveToNextcloud() {
 						</div>
 					</div>
 					<div v-if="message.reactions && Object.keys(message.reactions).length > 0" class="message__reactions">
-						<span v-for="(count, emoji) in message.reactions" :key="emoji">{{ emoji }} {{ count }}</span>
+						<button
+							v-for="(count, emoji) in message.reactions"
+							:key="emoji"
+							type="button"
+							class="message__reaction"
+							:class="{ 'message__reaction--own': isOwnReaction(emoji) }"
+							:title="t('churchtools_chat', 'Toggle reaction')"
+							@click="toggleReaction(emoji)">
+							<span aria-hidden="true">{{ emoji }}</span>
+							{{ count }}
+						</button>
 					</div>
 					<div v-if="message.status" class="message__status" role="status">
 						<span v-if="message.status === 'sending'">{{ t('churchtools_chat', 'Sending…') }}</span>
@@ -234,7 +262,20 @@ async function saveToNextcloud() {
 	transform: translateY(0);
 }
 .message__reactions { display: flex; flex-wrap: wrap; gap: 4px; margin-block-start: 4px; }
-.message__reactions span { padding: 2px 7px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-main-background); font-size: 12px; }
+.message__reaction {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 7px;
+	border: 1px solid var(--color-border);
+	border-radius: 999px;
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+	font-size: 12px;
+	cursor: pointer;
+}
+.message__reaction:hover, .message__reaction:focus-visible { border-color: var(--color-primary-element); }
+.message__reaction--own { border-color: var(--color-primary-element); background: var(--color-primary-element-light); }
 @media (hover: none) {
 	.message__actions {
 		position: static;

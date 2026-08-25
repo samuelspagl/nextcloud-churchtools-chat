@@ -86,11 +86,12 @@ export async function sendMessage(roomId: string, body: string, transactionId: s
 	return response.data.data
 }
 
-export async function reactToMessage(roomId: string, eventId: string, emoji: string, transactionId: string): Promise<void> {
-	await axios.post(
+export async function reactToMessage(roomId: string, eventId: string, emoji: string, transactionId: string): Promise<{ eventId: string; transactionId: string }> {
+	const response = await axios.post<ApiEnvelope<{ eventId: string; transactionId: string }>>(
 		endpoint(`/api/rooms/${encodeURIComponent(roomId)}/messages/${encodeURIComponent(eventId)}/reactions`),
 		{ emoji, transactionId },
 	)
+	return response.data.data
 }
 
 export async function editMessage(roomId: string, eventId: string, body: string, transactionId: string): Promise<{ eventId: string; transactionId: string }> {

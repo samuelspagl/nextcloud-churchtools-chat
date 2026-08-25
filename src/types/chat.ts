@@ -34,6 +34,7 @@ export interface ChatMessage {
 	mentionsMe?: boolean
 	relatesTo?: Record<string, unknown> | null
 	reactions?: Record<string, number>
+	ownReactions?: ReadonlyArray<{ readonly key: string; readonly eventId: string }>
 	status?: 'sending' | 'sent' | 'failed'
 	transactionId?: string
 	attachment?: ChatAttachment

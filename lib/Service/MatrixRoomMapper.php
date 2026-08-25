@@ -223,6 +223,7 @@ final class MatrixRoomMapper {
 		}
 		$replacements = [];
 		$reactions = [];
+		$ownReactions = [];
 		foreach ($events as $event) {
 			if (!is_array($event)) {
 				continue;
@@ -238,6 +239,12 @@ final class MatrixRoomMapper {
 				$key = (string)($relation['key'] ?? '');
 				if ($key !== '') {
 					$reactions[$target][$key] = (int)($reactions[$target][$key] ?? 0) + 1;
+					if ($currentUserId !== null && ($event['sender'] ?? '') === $currentUserId) {
+						$ownReactions[$target][] = [
+							'key' => $key,
+							'eventId' => (string)($event['event_id'] ?? ''),
+						];
+					}
 				}
 			}
 		}
@@ -291,6 +298,7 @@ final class MatrixRoomMapper {
 				'mentionsMe' => $mentionsMe,
 				'relatesTo' => $relation !== [] ? $relation : null,
 				'reactions' => $reactions[$eventId] ?? [],
+				'ownReactions' => $ownReactions[$eventId] ?? [],
 				'attachment' => $attachment,
 			];
 		}
