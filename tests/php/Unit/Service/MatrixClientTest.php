@@ -404,6 +404,25 @@ final class MatrixClientTest extends TestCase {
 		self::assertNull($this->matrix->resolveRoomAlias('secret-token', '#ctg_missing:chat.church.tools'));
 	}
 
+	public function testRedactSendsEmptyJsonObjectBody(): void {
+		$this->response->method('getStatusCode')->willReturn(200);
+		$this->response->method('getBody')->willReturn('{}');
+		$this->httpClient
+			->expects(self::once())
+			->method('put')
+			->with(
+				'https://chat.church.tools/_matrix/client/v3/rooms/%21room%3Achat.church.tools/redact/%24target%3Achat.church.tools/nc-txn',
+				self::callback(static function (array $options): bool {
+					self::assertSame('Bearer secret-token', $options['headers']['Authorization'] ?? '');
+					self::assertSame('{}', $options['body'] ?? '');
+					return true;
+				}),
+			)
+			->willReturn($this->response);
+
+		$this->matrix->redact('secret-token', '!room:chat.church.tools', '$target:chat.church.tools', 'nc-txn');
+	}
+
 	public function testSurfacesMatrixErrorCodeAndMessage(): void {
 		$this->response->method('getStatusCode')->willReturn(404);
 		$this->response->method('getBody')->willReturn(json_encode([

@@ -474,11 +474,13 @@ final class MatrixClient {
 			'PUT',
 			'/_matrix/client/v3/rooms/' . rawurlencode($roomId) . '/redact/' . rawurlencode($eventId) . '/' . rawurlencode($transactionId),
 			$accessToken,
+			// Synapse rejects an empty body with M_NOT_JSON, so send an empty JSON object.
+			(object)[],
 		);
 	}
 
 	/** @return array<string,mixed> */
-	private function request(string $method, string $path, ?string $accessToken = null, ?array $body = null, bool $mapAuthFailure = true): array {
+	private function request(string $method, string $path, ?string $accessToken = null, array|object|null $body = null, bool $mapAuthFailure = true): array {
 		$options = [
 			'headers' => ['Accept' => 'application/json', 'Content-Type' => 'application/json'],
 			'connect_timeout' => 5,
