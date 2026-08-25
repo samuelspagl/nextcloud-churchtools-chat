@@ -2,6 +2,16 @@
 
 All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
+## [0.6.3]
+
+### Added
+
+- Edit message (B5): edit your own sent text messages from the message
+  actions, with the composer prefilling the original text.
+- Mentions autocomplete (B10): typing `@` in the composer looks up
+  ChurchTools people and sends a real Matrix intentional mention
+  (`m.mentions`), so mentioned users are notified and highlighted for them.
+
 ## [0.6.2]
 
 ### Added

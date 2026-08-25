@@ -5,11 +5,20 @@ import NcIconSvgWrapper from '@nextcloud/vue/components/NcIconSvgWrapper'
 import NcRichContenteditable from '@nextcloud/vue/components/NcRichContenteditable'
 import { translate as t } from '@nextcloud/l10n'
 import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue'
+import { searchPersons } from '../services/chatApi'
 import type { ChatMessage } from '../types/chat'
 import ComposerActionsMenu from './ComposerActionsMenu.vue'
 
+interface MentionSuggestion {
+	id: string
+	label: string
+	icon: string
+	iconUrl: string | null
+	source: 'users'
+}
+
 const props = defineProps<{ disabled: boolean; replyTo?: ChatMessage | null; editingMessage?: ChatMessage | null }>()
-const emit = defineEmits<{ send: [body: string]; cancelReply: []; typing: [typing: boolean]; edit: [message: ChatMessage, body: string]; cancelEdit: [] }>()
+const emit = defineEmits<{ send: [body: string, mentions: string[]]; cancelReply: []; typing: [typing: boolean]; edit: [message: ChatMessage, body: string]; cancelEdit: [] }>()
 
 const draft = shallowRef('')
 
@@ -61,6 +70,43 @@ onBeforeUnmount(() => {
 	emit('typing', false)
 })
 
+const mentionUserData = shallowRef<Record<string, MentionSuggestion>>({})
+const mentionMatrixIds = new Map<string, string>()
+
+async function autoCompleteMention(search: string, callback: (items: MentionSuggestion[]) => void) {
+	const query = search.trim()
+	if (props.disabled || query.length < 2) {
+		callback([])
+		return
+	}
+	try {
+		const response = await searchPersons(query)
+		const items: MentionSuggestion[] = response.persons.map((person) => ({
+			id: String(person.id),
+			label: person.displayName,
+			icon: 'icon-user',
+			iconUrl: person.imageUrl,
+			source: 'users',
+		}))
+		mentionUserData.value = { ...mentionUserData.value, ...Object.fromEntries(items.map((item) => [item.id, item])) }
+		for (const person of response.persons) {
+			mentionMatrixIds.set(String(person.id), person.matrixUserId)
+		}
+		callback(items)
+	} catch {
+		callback([])
+	}
+}
+
+function extractMentionedMatrixIds(body: string): string[] {
+	const ids = new Set<string>()
+	for (const match of body.matchAll(/@(\d+)/g)) {
+		const matrixUserId = mentionMatrixIds.get(match[1])
+		if (matrixUserId) ids.add(matrixUserId)
+	}
+	return [...ids]
+}
+
 function submit() {
 	const body = draft.value.trim()
 	if (!canSend.value) return
@@ -68,7 +114,7 @@ function submit() {
 	if (props.editingMessage) {
 		emit('edit', props.editingMessage, body)
 	} else {
-		emit('send', body)
+		emit('send', body, extractMentionedMatrixIds(body))
 	}
 	draft.value = ''
 }
@@ -162,6 +208,8 @@ function insertEmoji(emoji: string) {
 					:placeholder="t('churchtools_chat', 'Write a message…')"
 					:link-autocomplete="true"
 					:emoji-autocomplete="false"
+					:auto-complete="autoCompleteMention"
+					:user-data="mentionUserData"
 					@submit="submit" />
 				<NcButton
 					class="composer__send"

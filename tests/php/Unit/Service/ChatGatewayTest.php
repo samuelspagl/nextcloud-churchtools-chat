@@ -150,6 +150,14 @@ final class ChatGatewayTest extends TestCase {
 		self::assertSame('$edited:chat.church.tools', $result['eventId']);
 	}
 
+	public function testSendRejectsAnInvalidMentionUserId(): void {
+		$gateway = $this->createGateway(200, 'mxc://chat.church.tools/matrix-avatar');
+
+		$this->expectException(\OCA\ChurchToolsChat\Exception\IntegrationException::class);
+
+		$gateway->send('user', '!room:chat.church.tools', 'hi', null, null, ['not-a-matrix-id']);
+	}
+
 	public function testGetMessageFetchesEventAndResolvesSender(): void {
 		$gateway = $this->createMessageGateway();
 

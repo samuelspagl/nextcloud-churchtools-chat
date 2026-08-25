@@ -136,9 +136,9 @@ async function choosePerson(person: PersonSearchResult) {
 	}
 }
 
-async function sendMessage(body: string) {
+async function sendMessage(body: string, mentions: string[]) {
 	try {
-		await send(body, { replyTo: replyTarget.value ?? undefined })
+		await send(body, { replyTo: replyTarget.value ?? undefined, mentions })
 		replyTarget.value = null
 	} catch {
 		// The optimistic message exposes retry in the timeline.
