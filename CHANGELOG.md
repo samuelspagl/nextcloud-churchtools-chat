@@ -6,9 +6,10 @@ All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
 ### Added
 
-- Inline replies are now rendered with a quote preview above the message. The original
-  message is resolved from the loaded timeline or fetched on demand, and the quote can
-  jump back to the original message.
+- Inline replies are now rendered as a block quote above the message, showing a
+  two-line excerpt of the original message. The original is resolved from the loaded
+  timeline or fetched on demand, the quote can jump back to the original message, and
+  replies are detected even when only the Matrix rich-reply fallback is available.
 - Matrix rich-reply fallback text (`> ` quoted lines) is stripped from reply bodies.
 
 ### Changed

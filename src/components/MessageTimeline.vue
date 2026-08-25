@@ -4,7 +4,7 @@ import { translate as t } from '@nextcloud/l10n'
 import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, watch, useTemplateRef } from 'vue'
 import { useDayLabel } from '../composables/useDayLabel'
 import type { ChatMessage } from '../types/chat'
-import { getReplyTargetId } from '../utils/relations'
+import { getReplyFallbackQuote, getReplyTargetId } from '../utils/relations'
 import { buildTimeline, type TimelineItem } from '../utils/timeline'
 import MessageBubble from './MessageBubble.vue'
 
@@ -32,12 +32,15 @@ const replyTargetMap = computed(() => {
 	return map
 })
 
-function replyContext(message: ChatMessage): { message: ChatMessage | null; canJump: boolean } {
+function replyContext(message: ChatMessage): { message: ChatMessage | null; canJump: boolean; fallback: string | null } {
 	const targetId = getReplyTargetId(message)
-	if (targetId === null) return { message: null, canJump: false }
+	if (targetId === null) {
+		return { message: null, canJump: false, fallback: getReplyFallbackQuote(message) }
+	}
 	return {
 		message: replyTargetMap.value.get(targetId) ?? null,
 		canJump: props.messages.some((item) => item.id === targetId),
+		fallback: null,
 	}
 }
 
@@ -143,6 +146,7 @@ onBeforeUnmount(() => {
 						:grouped="message.grouped"
 						:focused="message.id === focusMessageId"
 						:reply-to-message="replyContext(message).message"
+						:fallback-text="replyContext(message).fallback"
 						:can-jump-reply="replyContext(message).canJump"
 						@retry="emit('retry', $event)"
 						@reply="emit('reply', $event)"

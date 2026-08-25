@@ -179,4 +179,29 @@ describe('MessageBubble', () => {
 
 		expect(wrapper.findComponent(ReplyPreview).exists()).toBe(false)
 	})
+
+	it('renders a reply preview from the body fallback when there is no relation', () => {
+		const wrapper = shallowMount(MessageBubble, {
+			props: {
+				currentUserId: '@me:example.test',
+				message: {
+					id: '$reply',
+					sender: '@me:example.test',
+					body: '> <@other:example.test> Question text\n\nAnswer',
+					timestamp: 1,
+				},
+			},
+			global: {
+				stubs: {
+					MessageReferencePreview: MessageReferencePreviewStub,
+					MessageReferencePreviewControls: true,
+				},
+			},
+		})
+
+		const preview = wrapper.findComponent(ReplyPreview)
+		expect(preview.exists()).toBe(true)
+		expect(preview.props('fallbackText')).toBe('Question text')
+		expect(preview.props('canJump')).toBe(false)
+	})
 })

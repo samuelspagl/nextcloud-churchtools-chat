@@ -19,7 +19,12 @@ const target: ChatMessage = {
 }
 
 describe('ReplyPreview', () => {
-	function mountPreview(props: Partial<{ message: ChatMessage | null; currentUserId: string; canJump: boolean }> = {}) {
+	function mountPreview(props: {
+		message?: ChatMessage | null
+		fallbackText?: string | null
+		currentUserId?: string
+		canJump?: boolean
+	} = {}) {
 		return shallowMount(ReplyPreview, {
 			props: {
 				message: target,
@@ -29,29 +34,30 @@ describe('ReplyPreview', () => {
 		})
 	}
 
-	it('renders the original sender and message text', () => {
+	it('renders the original sender and a block quote with the message text', () => {
 		const wrapper = mountPreview()
 
 		expect(wrapper.get('.reply-preview__sender').text()).toBe('Anna Schmidt')
-		expect(wrapper.get('.reply-preview__text').text()).toBe('Original message text')
-	})
-
-	it('truncates long message bodies', () => {
-		const wrapper = mountPreview({ message: { ...target, body: 'x'.repeat(300) } })
-
-		expect(wrapper.get('.reply-preview__text').text()).toMatch(/^x{160}…$/)
+		expect(wrapper.get('.reply-preview__quote').text()).toBe('Original message text')
+		expect(wrapper.find('blockquote.reply-preview__quote').exists()).toBe(true)
 	})
 
 	it('shows a deleted placeholder for redacted originals', () => {
 		const wrapper = mountPreview({ message: { ...target, redacted: true, body: '' } })
 
-		expect(wrapper.get('.reply-preview__text').text()).toBe('Message deleted')
+		expect(wrapper.get('.reply-preview__quote').text()).toBe('Message deleted')
 	})
 
-	it('shows a placeholder when the original is unavailable', () => {
-		const wrapper = mountPreview({ message: null })
+	it('shows the fallback quote when the original is unavailable', () => {
+		const wrapper = mountPreview({ message: null, fallbackText: 'quoted original lines' })
 
-		expect(wrapper.get('.reply-preview__text').text()).toBe('Original message unavailable')
+		expect(wrapper.get('.reply-preview__quote').text()).toBe('quoted original lines')
+	})
+
+	it('shows a placeholder when neither original nor fallback is available', () => {
+		const wrapper = mountPreview({ message: null, fallbackText: null })
+
+		expect(wrapper.get('.reply-preview__quote').text()).toBe('Replying to a message')
 	})
 
 	it('emits jump on click when jumpable', async () => {

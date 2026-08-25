@@ -6,6 +6,7 @@ import { messageSenderLabel } from '../utils/messages'
 
 const props = defineProps<{
 	message: ChatMessage | null
+	fallbackText?: string | null
 	currentUserId: string
 	canJump?: boolean
 }>()
@@ -16,11 +17,13 @@ const isDeleted = computed(() => props.message !== null && (props.message.redact
 const senderLabel = computed(() => props.message === null
 	? ''
 	: messageSenderLabel(props.message, props.currentUserId, t('churchtools_chat', 'You')))
-const displayText = computed(() => {
-	if (props.message === null) return t('churchtools_chat', 'Original message unavailable')
-	if (isDeleted.value) return t('churchtools_chat', 'Message deleted')
-	const text = props.message.attachment ? props.message.attachment.filename : props.message.body
-	return text.length > 160 ? `${text.slice(0, 160)}…` : text
+const excerpt = computed(() => {
+	if (props.message !== null) {
+		if (isDeleted.value) return t('churchtools_chat', 'Message deleted')
+		return props.message.attachment ? props.message.attachment.filename : props.message.body
+	}
+	if (props.fallbackText) return props.fallbackText
+	return t('churchtools_chat', 'Replying to a message')
 })
 </script>
 
@@ -33,11 +36,11 @@ const displayText = computed(() => {
 		:title="t('churchtools_chat', 'Jump to the original message')"
 		@click="emit('jump')">
 		<span class="reply-preview__sender">{{ senderLabel }}</span>
-		<span class="reply-preview__text">{{ displayText }}</span>
+		<blockquote class="reply-preview__quote">{{ excerpt }}</blockquote>
 	</button>
 	<div v-else class="reply-preview reply-preview--static" :class="{ 'reply-preview--deleted': isDeleted }">
 		<span v-if="message" class="reply-preview__sender">{{ senderLabel }}</span>
-		<span class="reply-preview__text">{{ displayText }}</span>
+		<blockquote class="reply-preview__quote">{{ excerpt }}</blockquote>
 	</div>
 </template>
 
@@ -49,7 +52,7 @@ const displayText = computed(() => {
 	flex-direction: column;
 	gap: 2px;
 	margin-block-end: 6px;
-	padding: 6px 10px;
+	padding: 4px 10px;
 	border: none;
 	border-inline-start: 3px solid var(--color-border-maxcontrast);
 	border-radius: var(--border-radius-large);
@@ -62,5 +65,13 @@ const displayText = computed(() => {
 .reply-preview--static { cursor: default; }
 .reply-preview--deleted { color: var(--color-text-maxcontrast); font-style: italic; }
 .reply-preview__sender { color: var(--color-text-maxcontrast); font-size: 12px; font-weight: 600; }
-.reply-preview__text { overflow: hidden; font-size: 13px; white-space: nowrap; text-overflow: ellipsis; }
+.reply-preview__quote {
+	display: -webkit-box;
+	margin: 0;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+	font-size: 13px;
+	white-space: normal;
+}
 </style>

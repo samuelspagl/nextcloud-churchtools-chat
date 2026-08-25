@@ -12,7 +12,7 @@ import type { ChatMessage } from '../types/chat'
 import { displayableAvatarUrl } from '../utils/avatar'
 import { attachmentDownloadUrl } from '../utils/attachments'
 import { messageSenderLabel } from '../utils/messages'
-import { getReplyTargetId } from '../utils/relations'
+import { getReplyFallbackQuote, isReplyMessage } from '../utils/relations'
 import MessageReferencePreview from './MessageReferencePreview.vue'
 import MessageReferencePreviewControls from './MessageReferencePreviewControls.vue'
 import MessageAttachment from './MessageAttachment.vue'
@@ -39,7 +39,9 @@ const isDeleted = computed(() => props.message.redacted === true || props.messag
 const canDelete = computed(() => isOwn.value && props.message.status === 'sent' && !isDeleted.value)
 const isOwn = computed(() => props.message.sender === props.currentUserId)
 const senderLabel = computed(() => messageSenderLabel(props.message, props.currentUserId, t('churchtools_chat', 'You')))
-const hasReply = computed(() => getReplyTargetId(props.message) !== null)
+const hasReply = computed(() => isReplyMessage(props.message))
+const replyFallbackText = computed(() =>
+	hasReply.value ? getReplyFallbackQuote(props.message) : null)
 const savingAttachment = shallowRef(false)
 
 const formattedTime = computed(() => new Intl.DateTimeFormat(undefined, {
@@ -108,6 +110,7 @@ async function saveToNextcloud() {
 							<ReplyPreview
 								v-if="hasReply && !isDeleted"
 								:message="replyToMessage ?? null"
+								:fallback-text="replyFallbackText"
 								:current-user-id="currentUserId"
 								:can-jump="canJumpReply"
 								@jump="emit('jump')" />
