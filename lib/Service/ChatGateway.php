@@ -423,7 +423,7 @@ final class ChatGateway {
 	 * @param array<string,list<string>> $directRooms
 	 * @return list<array<string,mixed>>
 	 */
-	private function normalizeRooms(array $sync, string $matrixToken, string $currentMatrixUserId, array $directRooms, bool $backfillLastMessage = false): array {
+	private function normalizeRooms(array $sync, string $matrixToken, string $currentMatrixUserId, array $directRooms, bool $initialSnapshot = false): array {
 		$joined = $sync['rooms']['join'] ?? [];
 		if (!is_array($joined)) {
 			return [];
@@ -437,23 +437,26 @@ final class ChatGateway {
 			}
 			$stateEvents = is_array($room['state']['events'] ?? null) ? $room['state']['events'] : [];
 			$timelineEvents = is_array($room['timeline']['events'] ?? null) ? $room['timeline']['events'] : [];
-			$memberEvents = $this->matrix->roomMembers($matrixToken, $roomId);
-			if ($memberEvents === []) {
-				$memberEvents = array_values(array_filter(
-					array_merge($stateEvents, $timelineEvents),
-					static fn (mixed $event): bool => is_array($event) && ($event['type'] ?? '') === 'm.room.member',
-				));
+			if ($initialSnapshot) {
+				$memberEvents = $this->initialMemberEvents($roomId, $room, $stateEvents, $timelineEvents, $directRooms, $currentMatrixUserId);
+				$profileUserIds = $this->initialProfileUserIds($roomId, $room, $directRooms, $currentMatrixUserId);
+				$profiles = $this->profiles($matrixToken, $memberEvents, $profileCache, $profileUserIds);
+			} else {
+				$memberEvents = $this->matrix->roomMembers($matrixToken, $roomId);
+				if ($memberEvents === []) {
+					$memberEvents = array_values(array_filter(
+						array_merge($stateEvents, $timelineEvents),
+						static fn (mixed $event): bool => is_array($event) && ($event['type'] ?? '') === 'm.room.member',
+					));
+				}
+				if ($memberEvents === []) {
+					$heroes = is_array($room['summary']['m.heroes'] ?? null) ? $room['summary']['m.heroes'] : [];
+					$memberEvents = $this->syntheticMembers($heroes);
+				}
+				$profiles = $this->profiles($matrixToken, $memberEvents, $profileCache);
 			}
-			if ($memberEvents === []) {
-				$heroes = is_array($room['summary']['m.heroes'] ?? null) ? $room['summary']['m.heroes'] : [];
-				$memberEvents = $this->syntheticMembers($heroes);
-			}
-			$profiles = $this->profiles($matrixToken, $memberEvents, $profileCache);
 			$members = $this->roomMapper->members($memberEvents, $profiles);
 			$mapped = $this->roomMapper->room($roomId, $room, $directRooms, $currentMatrixUserId, $members);
-			if ($backfillLastMessage) {
-				$mapped = $this->backfillLatestMessage($matrixToken, $roomId, $currentMatrixUserId, $members, $mapped);
-			}
 			$rooms[] = $mapped;
 		}
 
@@ -462,42 +465,68 @@ final class ChatGateway {
 	}
 
 	/**
-	 * Fetch the authoritative latest message via the Matrix messages endpoint (dir=b),
-	 * which can be newer than the full-sync timeline snapshot.
-	 *
-	 * @param list<array{id:string,displayName:string,avatarUrl:string|null,membership:string}> $members
 	 * @param array<string,mixed> $room
-	 * @return array<string,mixed>
+	 * @param list<array<string,mixed>> $stateEvents
+	 * @param list<array<string,mixed>> $timelineEvents
+	 * @param array<string,list<string>> $directRooms
+	 * @return list<array<string,mixed>>
 	 */
-	private function backfillLatestMessage(string $matrixToken, string $roomId, string $currentMatrixUserId, array $members, array $room): array {
-		try {
-			$latest = $this->matrix->messages($matrixToken, $roomId, null, 1);
-			$chunk = is_array($latest['chunk'] ?? null) ? $latest['chunk'] : [];
-			if ($chunk === []) {
-				return $room;
+	private function initialMemberEvents(string $roomId, array $room, array $stateEvents, array $timelineEvents, array $directRooms, string $currentMatrixUserId): array {
+		$memberEvents = array_values(array_filter(
+			array_merge($stateEvents, $timelineEvents),
+			static fn (mixed $event): bool => is_array($event) && ($event['type'] ?? '') === 'm.room.member',
+		));
+		$knownUserIds = [];
+		foreach ($memberEvents as $event) {
+			if (is_string($event['state_key'] ?? null)) {
+				$knownUserIds[$event['state_key']] = true;
 			}
-			$mapped = $this->roomMapper->events([$chunk[0]], $members, $currentMatrixUserId);
-			if ($mapped === []) {
-				return $room;
+		}
+		foreach ($this->initialProfileUserIds($roomId, $room, $directRooms, $currentMatrixUserId) as $matrixUserId) {
+			if (!isset($knownUserIds[$matrixUserId])) {
+				$memberEvents = array_merge($memberEvents, $this->syntheticMembers([$matrixUserId]));
 			}
-			$message = $mapped[0];
-			$knownIds = [];
-			foreach ($room['events'] ?? [] as $event) {
-				if (is_array($event) && isset($event['id'])) {
-					$knownIds[] = $event['id'];
+		}
+		return $memberEvents;
+	}
+
+	/**
+	 * Direct-chat targets and room heroes are the only identities whose missing
+	 * lazy-loaded member state affects the initial room title or avatar.
+	 *
+	 * @param array<string,mixed> $room
+	 * @param array<string,list<string>> $directRooms
+	 * @return list<string>
+	 */
+	private function initialProfileUserIds(string $roomId, array $room, array $directRooms, string $currentMatrixUserId): array {
+		$userIds = [];
+		foreach ($directRooms as $matrixUserId => $roomIds) {
+			if ($matrixUserId !== $currentMatrixUserId && in_array($roomId, $roomIds, true)) {
+				$userIds[] = $matrixUserId;
+			}
+		}
+		$stateEvents = is_array($room['state']['events'] ?? null) ? $room['state']['events'] : [];
+		$timelineEvents = is_array($room['timeline']['events'] ?? null) ? $room['timeline']['events'] : [];
+		$hasExplicitName = false;
+		foreach (array_merge($stateEvents, $timelineEvents) as $event) {
+			if (!is_array($event) || !in_array($event['type'] ?? '', ['m.room.name', 'm.room.canonical_alias'], true)) {
+				continue;
+			}
+			$content = is_array($event['content'] ?? null) ? $event['content'] : [];
+			if (trim((string)($content['name'] ?? $content['alias'] ?? '')) !== '') {
+				$hasExplicitName = true;
+				break;
+			}
+		}
+		if (!$hasExplicitName) {
+			$heroes = is_array($room['summary']['m.heroes'] ?? null) ? $room['summary']['m.heroes'] : [];
+			foreach ($heroes as $matrixUserId) {
+				if (is_string($matrixUserId) && $matrixUserId !== $currentMatrixUserId) {
+					$userIds[] = $matrixUserId;
 				}
 			}
-			if (!in_array($message['id'], $knownIds, true)) {
-				$room['events'][] = $message;
-			}
-			if (($room['lastMessage']['timestamp'] ?? 0) <= ($message['timestamp'] ?? 0)) {
-				$room['lastMessage'] = $message;
-			}
-			return $room;
-		} catch (\Throwable) {
-			// Fall back to the full-sync lastMessage if the authoritative fetch fails.
-			return $room;
 		}
+		return array_values(array_unique($userIds));
 	}
 
 	/**
@@ -512,19 +541,27 @@ final class ChatGateway {
 	/**
 	 * @param list<array<string,mixed>> $memberEvents
 	 * @param array<string,array{displayname?:string,avatar_url?:string}|null> $cache
+	 * @param list<string>|null $allowedUserIds
 	 * @return array<string,array{displayname?:string,avatar_url?:string}>
 	 */
-	private function profiles(string $matrixToken, array $memberEvents, array &$cache = []): array {
+	private function profiles(string $matrixToken, array $memberEvents, array &$cache = [], ?array $allowedUserIds = null): array {
 		$profiles = [];
+		$allowed = $allowedUserIds === null ? null : array_fill_keys($allowedUserIds, true);
+		$latest = [];
 		foreach ($memberEvents as $event) {
 			if (($event['type'] ?? '') !== 'm.room.member' || !is_string($event['state_key'] ?? null)) {
 				continue;
 			}
+			$latest[$event['state_key']] = $event;
+		}
+		foreach ($latest as $matrixUserId => $event) {
 			$content = is_array($event['content'] ?? null) ? $event['content'] : [];
 			if (trim((string)($content['displayname'] ?? '')) !== '' && trim((string)($content['avatar_url'] ?? '')) !== '') {
 				continue;
 			}
-			$matrixUserId = $event['state_key'];
+			if ($allowed !== null && !isset($allowed[$matrixUserId])) {
+				continue;
+			}
 			if (!array_key_exists($matrixUserId, $cache)) {
 				$cache[$matrixUserId] = $this->matrix->profile($matrixToken, $matrixUserId);
 			}

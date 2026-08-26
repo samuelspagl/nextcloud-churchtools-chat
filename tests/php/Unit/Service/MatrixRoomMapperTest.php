@@ -337,6 +337,24 @@ final class MatrixRoomMapperTest extends TestCase {
 		self::assertSame('Reply without quote prefix', $messages[0]['body']);
 	}
 
+	public function testReplyFallbackPreservesUtf8ContainingAnNELByte(): void {
+		$reply = "Reply with Ņ";
+		$messages = $this->mapper->events([[
+			'type' => 'm.room.message',
+			'event_id' => '$reply',
+			'sender' => '@ct_ben:chat.church.tools',
+			'origin_server_ts' => 200,
+			'content' => [
+				'msgtype' => 'm.text',
+				'body' => "> <@ct_anna:chat.church.tools> Original\n\n" . $reply,
+				'm.relates_to' => ['m.in_reply_to' => ['event_id' => '$original']],
+			],
+		]], []);
+
+		self::assertSame($reply, $messages[0]['body']);
+		self::assertIsString(json_encode($messages, JSON_THROW_ON_ERROR));
+	}
+
 	public function testKeepsBlockquoteStyleBodyWhenNotAReply(): void {
 		$messages = $this->mapper->events([[
 			'type' => 'm.room.message',

@@ -88,15 +88,6 @@ export function useChat() {
 			const response = await getRooms()
 			rooms.value = response.rooms
 			nextBatch.value = response.nextBatch ?? undefined
-			try {
-				// Like Element's continuous sync, reconcile with a fresh sync before painting
-				// so unread counts reflect the latest notification_count.
-				const fresh = await syncRooms(nextBatch.value)
-				nextBatch.value = fresh.nextBatch ?? nextBatch.value
-				rooms.value = mergeRooms(rooms.value, fresh.rooms)
-			} catch {
-				// Keep the getRooms snapshot if the reconcile sync fails.
-			}
 			void syncLoop()
 		} catch (caught) {
 			error.value = caught instanceof Error ? caught.message : 'Unable to load ChurchTools Chat.'

@@ -144,6 +144,19 @@ The gateway uses standard Matrix endpoints only:
 - `PUT /_matrix/client/v3/rooms/{roomId}/send/m.room.message/{transactionId}`
 - `PUT /_matrix/client/v3/rooms/{roomId}/send/m.reaction/{transactionId}`
 
+The initial room list is a snapshot built from one `/sync` response. Room-local
+member events from its state and timeline are used first; a global `/profile`
+lookup is only used when a direct-chat target or a necessary unnamed-room hero
+lacks display metadata. The snapshot does not issue a `/members` request or a
+`/messages?limit=1` backfill for every room. Its timeline window is the source
+for `lastMessage`; rooms without a displayable event initially return
+`lastMessage: null` and load their history when opened.
+
+After applying that snapshot, the client starts incremental `/sync` requests in
+the background using `next_batch`. A request with no new events may remain open
+for the configured 20 seconds: this is intentional Matrix long polling and must
+not delay rendering the initial room list or ending its loading state.
+
 End-to-end encrypted rooms are detected through `m.room.encryption` and are
 shown as unsupported. The server does not attempt to decrypt or return encrypted
 event payloads.
