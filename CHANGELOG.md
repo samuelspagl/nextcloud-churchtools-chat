@@ -2,6 +2,19 @@
 
 All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
+## [0.6.4]
+
+### Fixed
+
+- Load Matrix rooms without requiring the administrator-only ChurchTools
+  `/api/chat` metadata endpoint.
+- Report forbidden ChurchTools resources separately from invalid access tokens.
+
+### Changed
+
+- Document the administrator permissions and inference limits that apply to
+  future ChurchTools group and event chat linking.
+
 ## [0.6.3]
 
 ### Fixed

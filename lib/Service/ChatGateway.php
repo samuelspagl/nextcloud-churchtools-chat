@@ -126,7 +126,7 @@ final class ChatGateway {
 		];
 	}
 
-	/** @return array{rooms:list<array<string,mixed>>,nextBatch:string|null,churchToolsChats:list<array<string,mixed>>} */
+	/** @return array{rooms:list<array<string,mixed>>,nextBatch:string|null} */
 	public function getRooms(string $userId): array {
 		$matrixToken = $this->requireMatrixToken($userId);
 		$sync = $this->matrix->sync($matrixToken);
@@ -135,10 +135,6 @@ final class ChatGateway {
 		return [
 			'rooms' => $this->normalizeRooms($sync, $matrixToken, $currentMatrixUserId, $directRooms, true),
 			'nextBatch' => isset($sync['next_batch']) ? (string)$sync['next_batch'] : null,
-			'churchToolsChats' => $this->churchTools->getChats(
-				$this->appConfig->requireTenantUrl(),
-				$this->secrets->getChurchToolsToken($userId),
-			),
 		];
 	}
 

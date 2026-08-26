@@ -43,6 +43,103 @@ final class ChatGatewayTest extends TestCase {
 		self::assertSame('https://tenant.church.tools/images/anna.jpg', $results[0]['imageUrl']);
 	}
 
+	public function testGetRoomsUsesOnlyMatrixForNonAdminUsers(): void {
+		$config = $this->createMock(IConfig::class);
+		$config->method('getAppValue')->willReturnCallback(
+			static fn (string $appId, string $key, string $default = ''): string => match ($key) {
+				'churchtools_tenant_url' => 'https://tenant.church.tools',
+				'matrix_server_url' => 'https://chat.church.tools',
+				default => $default,
+			},
+		);
+		$config->method('getUserValue')->willReturnCallback(
+			static fn (string $userId, string $appId, string $key, string $default): string => match ($key) {
+				'churchtools_token' => 'encrypted-non-admin-ct-token',
+				'matrix_access_token' => 'encrypted-matrix-token',
+				'matrix_user_id' => '@ct_me:chat.church.tools',
+				default => $default,
+			},
+		);
+		$crypto = $this->createMock(ICrypto::class);
+		$crypto->method('decrypt')->willReturnCallback(static fn (string $value): string => match ($value) {
+			'encrypted-matrix-token' => 'matrix-token',
+			'encrypted-non-admin-ct-token' => 'non-admin-ct-token',
+			default => '',
+		});
+
+		$memberEvents = [
+			['type' => 'm.room.member', 'state_key' => '@ct_me:chat.church.tools', 'content' => [
+				'membership' => 'join',
+				'displayname' => 'Me',
+				'avatar_url' => 'mxc://chat.church.tools/me',
+			]],
+			['type' => 'm.room.member', 'state_key' => '@ct_other:chat.church.tools', 'content' => [
+				'membership' => 'join',
+				'displayname' => 'Other Person',
+				'avatar_url' => 'mxc://chat.church.tools/other',
+			]],
+		];
+		$syncResponse = $this->createMock(IResponse::class);
+		$syncResponse->method('getStatusCode')->willReturn(200);
+		$syncResponse->method('getBody')->willReturn(json_encode([
+			'next_batch' => 'next-token',
+			'account_data' => ['events' => [[
+				'type' => 'm.direct',
+				'content' => ['@ct_other:chat.church.tools' => ['!room:chat.church.tools']],
+			]]],
+			'rooms' => ['join' => [
+				'!room:chat.church.tools' => [
+					'state' => ['events' => $memberEvents],
+					'timeline' => ['events' => [], 'limited' => false],
+					'summary' => ['m.joined_member_count' => 2],
+				],
+			]],
+		], JSON_THROW_ON_ERROR));
+		$membersResponse = $this->createMock(IResponse::class);
+		$membersResponse->method('getStatusCode')->willReturn(200);
+		$membersResponse->method('getBody')->willReturn(json_encode(['chunk' => $memberEvents], JSON_THROW_ON_ERROR));
+		$messagesResponse = $this->createMock(IResponse::class);
+		$messagesResponse->method('getStatusCode')->willReturn(200);
+		$messagesResponse->method('getBody')->willReturn(json_encode(['chunk' => []], JSON_THROW_ON_ERROR));
+
+		$httpClient = $this->createMock(IClient::class);
+		$httpClient->expects(self::exactly(3))->method('get')->willReturnCallback(
+			static function (string $url, array $options) use ($syncResponse, $membersResponse, $messagesResponse): IResponse {
+				self::assertStringStartsWith('https://chat.church.tools/_matrix/', $url);
+				self::assertStringNotContainsString('tenant.church.tools/api/chat', $url);
+				self::assertSame('Bearer matrix-token', $options['headers']['Authorization'] ?? '');
+				if (str_contains($url, '/members?')) {
+					return $membersResponse;
+				}
+				if (str_contains($url, '/messages?')) {
+					return $messagesResponse;
+				}
+				self::assertStringContainsString('/sync?', $url);
+				return $syncResponse;
+			},
+		);
+		$clientService = $this->createMock(IClientService::class);
+		$clientService->method('newClient')->willReturn($httpClient);
+		$appConfigService = new AppConfigService($config, new TenantUrlValidator());
+		$matrixUserId = new MatrixUserId($appConfigService);
+		$gateway = new ChatGateway(
+			new SecretService($config, $crypto),
+			new ChurchToolsClient($clientService),
+			new MatrixClient($clientService, $matrixUserId, $appConfigService),
+			$matrixUserId,
+			new MatrixRoomMapper(),
+			$appConfigService,
+			$this->createMock(LoggerInterface::class),
+		);
+
+		$result = $gateway->getRooms('user');
+
+		self::assertSame('next-token', $result['nextBatch']);
+		self::assertCount(1, $result['rooms']);
+		self::assertSame('!room:chat.church.tools', $result['rooms'][0]['id']);
+		self::assertArrayNotHasKey('churchToolsChats', $result);
+	}
+
 	private function createGateway(int $directoryStatus, ?string $matrixAvatarUrl): ChatGateway {
 		$config = $this->createMock(IConfig::class);
 		$config->method('getUserValue')->willReturnCallback(

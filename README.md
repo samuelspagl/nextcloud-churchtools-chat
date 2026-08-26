@@ -11,16 +11,23 @@ direct conversation for the selected person.
 
 ## Current integration boundary
 
-The published ChurchTools OpenAPI exposes chat metadata at `/api/chat`, but no
-message transport or Matrix token-exchange endpoint. The app validates and
+The published ChurchTools OpenAPI exposes administrator-only chat metadata at
+`/api/chat`, but no message transport or Matrix token-exchange endpoint. Reading
+that endpoint requires the broad `administer persons` or `administer settings`
+permission, so it is not part of normal user requests. The app validates and
 stores each user's ChurchTools login token separately. To obtain a Matrix
 session, users enter only their CT Chat password. The Matrix user ID is derived
-from the GUID returned by `/api/whoami`: the GUID is normalized to lowercase
-and formatted as `@ct_<guid>:<matrix-server-name>`, where the Matrix server name
-is the host of the homeserver URL configured by the administrator. The derived ID
+from the GUID returned by `/api/whoami`: the GUID is normalized to lowercase and
+formatted as `@ct_<guid>:<matrix-server-name>`, where the Matrix server name is
+the host of the homeserver URL configured by the administrator. The derived ID
 and password are sent once to `POST <matrix-homeserver>/_matrix/client/v3/login`;
-the password is not persisted. Only the returned Matrix access token, user ID and
-device ID are kept. The app never treats the API token as a Matrix password.
+the password is not persisted. Only the returned Matrix access token, user ID
+and device ID are kept. The app never treats the API token as a Matrix password.
+
+Matrix canonical aliases can identify a ChurchTools chat type and chat-specific
+GUID, but they do not contain the numeric ChurchTools group or event ID. Future
+group or event linking must use APIs available under the connected user's own
+permissions and must not make `/api/chat` a runtime dependency.
 
 ## Starting a direct chat
 

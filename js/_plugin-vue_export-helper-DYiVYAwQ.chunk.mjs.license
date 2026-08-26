@@ -84,7 +84,7 @@ This file is generated from multiple sources. Included packages:
 	- version: 1.19.0
 	- license: MIT
 - churchtools-chat-nextcloud
-	- version: 0.6.2
+	- version: 0.6.4
 	- license: AGPL-3.0-or-later
 - dompurify
 	- version: 3.4.14

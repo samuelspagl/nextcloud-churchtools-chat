@@ -166,8 +166,11 @@ final class ChurchToolsClient {
 				'http_errors' => false,
 			]);
 			$status = $response->getStatusCode();
-			if ($status === 401 || $status === 403) {
-				throw new IntegrationException('invalid_token', 'The ChurchTools access token is invalid or lacks permission.', 401);
+			if ($status === 401) {
+				throw new IntegrationException('invalid_token', 'The ChurchTools access token is invalid.', 401);
+			}
+			if ($status === 403) {
+				throw new IntegrationException('churchtools_forbidden', 'ChurchTools denied access to this resource.', 403);
 			}
 			if ($status < 200 || $status >= 300) {
 				throw new IntegrationException('churchtools_unavailable', 'ChurchTools could not complete the request.', 502);
