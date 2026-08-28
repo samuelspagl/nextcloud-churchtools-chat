@@ -79,23 +79,33 @@ publish an existing release manually.
 ## Local Docker test stack
 
 The included Compose stack runs Nextcloud 34 with PostgreSQL and Redis, mounts
-this repository as the local `churchtools_chat` app, and enables it during
+the release-like `.build/churchtools_chat` staging directory as the local app,
+and enables it during
 Nextcloud startup. On the first start it also downloads and enables Deck, Talk,
 Tables, and the OpenStreetMap integration. Together with the bundled Files and
 Profile apps, these provide a useful dynamic Smart Picker test set. The first
 startup therefore needs access to the Nextcloud App Store and can take longer.
 Downloaded provider apps are kept in a dedicated `nextcloud_custom_apps`
 volume; a one-shot init service gives Nextcloud's web-server user access to
-that volume, while the local ChurchTools Chat source remains mounted read-only
-inside it.
+that volume, while only the staged, installable ChurchTools Chat app is mounted
+read-only inside it. Source files, tests, and Node dependencies are not exposed
+to the container.
 
 Build the frontend assets and start the stack:
 
 ```sh
 corepack pnpm install --frozen-lockfile
-pnpm build
+pnpm build:docker
 cp .env.example .env
 docker compose up -d --wait
+```
+
+After changing the source, rebuild the staging directory and recreate the app
+container so its bind mount is refreshed:
+
+```sh
+pnpm build:docker
+docker compose up -d --force-recreate app
 ```
 
 Open <http://localhost:8080> and sign in with `admin` / `admin`, unless those

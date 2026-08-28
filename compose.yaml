@@ -60,7 +60,7 @@ services:
     volumes:
       - nextcloud_html:/var/www/html
       - nextcloud_custom_apps:/var/www/html/custom_apps
-      - ./:/var/www/html/custom_apps/churchtools_chat:ro
+      - ./.build/churchtools_chat:/var/www/html/custom_apps/churchtools_chat:ro
       - ./docker/before-starting/10-enable-churchtools-chat.sh:/docker-entrypoint-hooks.d/before-starting/10-enable-churchtools-chat.sh:ro
     healthcheck:
       test:

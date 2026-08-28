@@ -20,6 +20,8 @@ All notable changes to ChurchTools Chat for Nextcloud are documented here.
   future ChurchTools group and event chat linking.
 - Build the initial room list from the Matrix sync snapshot, with only targeted
   profile fallbacks instead of per-room member and message requests.
+- Build Docker and release packages from the same filtered, installable app
+  staging directory.
 
 ## [0.6.3]
 
