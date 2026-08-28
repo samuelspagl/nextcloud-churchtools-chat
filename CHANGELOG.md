@@ -13,6 +13,8 @@ All notable changes to ChurchTools Chat for Nextcloud are documented here.
   quote.
 - Show the initial room snapshot without waiting for the first incremental
   Matrix long poll.
+- Keep the conversation list, message timeline, and composer inside independent
+  bounded scroll regions when chats or room lists are long.
 
 ### Changed
 

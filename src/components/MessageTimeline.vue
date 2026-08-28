@@ -174,7 +174,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.timeline { width: 100%; min-height: 0; overflow-y: auto; }
+.timeline { width: 100%; min-height: 0; flex: 1 1 0; overflow-y: auto; overscroll-behavior: contain; }
 .timeline__content { display: flex; width: 100%; min-height: 100%; flex-direction: column; gap: 14px; padding: 24px clamp(16px, 4vw, 56px); }
 .timeline__state { margin: auto; color: var(--color-text-maxcontrast); }
 .timeline__day {

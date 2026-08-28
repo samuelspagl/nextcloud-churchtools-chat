@@ -81,13 +81,13 @@ watch(query, (value, _previous, onCleanup) => {
 </template>
 
 <style scoped>
-.person-search { display: flex; height: 100%; flex-direction: column; background: var(--color-main-background); }
-.person-search__heading { display: grid; gap: 12px; padding: 16px; border-bottom: 1px solid var(--color-border); }
+.person-search { display: flex; min-height: 0; block-size: 100%; flex-direction: column; overflow: hidden; background: var(--color-main-background); }
+.person-search__heading { display: grid; flex: 0 0 auto; gap: 12px; padding: 16px; border-bottom: 1px solid var(--color-border); }
 .person-search__title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .person-search__title h1 { margin: 0; font-size: 20px; }
 .person-search__state { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 120px; padding: 16px; color: var(--color-text-maxcontrast); text-align: center; }
 .person-search__state--error { color: var(--color-error-text); }
-.person-search__results { overflow-y: auto; margin: 0; padding: 8px; list-style: none; }
+.person-search__results { min-height: 0; flex: 1 1 0; overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 8px; list-style: none; }
 .person-result { display: flex; width: 100%; min-height: 60px; align-items: center; gap: 10px; padding: 8px; border: 0; border-radius: var(--border-radius-large); color: var(--color-main-text); background: transparent; text-align: start; cursor: pointer; }
 .person-result:hover, .person-result:focus-visible { background: var(--color-background-hover); }
 .person-result:focus-visible { outline: 2px solid var(--color-primary-element); outline-offset: -2px; }
