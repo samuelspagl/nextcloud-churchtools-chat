@@ -14,19 +14,28 @@ import {
 	searchConversations as searchConversationsRequest,
 	searchPersons as searchPersonsRequest,
 	searchRoomMessages as searchRoomMessagesRequest,
+	sendAttachment,
 	sendMessage,
 	setFullyRead,
 	setTyping as setTypingRequest,
 	startDirectChat as startDirectChatRequest,
 	syncRooms,
 } from '../services/chatApi'
-import type { ChatMessage, ChatRoom, ChatStatus, ConversationSearchResult, PersonSearchResult, RoomDetails } from '../types/chat'
+import type { ChatAttachment, ChatMessage, ChatRoom, ChatStatus, ConversationSearchResult, PersonSearchResult, RoomDetails } from '../types/chat'
+import { MAX_ATTACHMENT_BYTES } from '../utils/attachments'
 import { mergeRooms } from '../utils/rooms'
 import { backoffDelay } from '../utils/backoff'
 import { buildReplyRelation, getReplyTargetId } from '../utils/relations'
 
 function transactionId(): string {
 	return `nc-${crypto.randomUUID()}`
+}
+
+function attachmentKind(mimeType: string): ChatAttachment['kind'] {
+	if (mimeType.startsWith('image/')) return 'image'
+	if (mimeType.startsWith('audio/')) return 'audio'
+	if (mimeType.startsWith('video/')) return 'video'
+	return 'file'
 }
 
 function removeReaction(reactions: Record<string, number> | undefined, emoji: string): Record<string, number> {
@@ -187,6 +196,46 @@ export function useChat() {
 		}
 	}
 
+	async function sendFile(file: File, options?: { transactionId?: string }) {
+		const roomId = activeRoomId.value
+		if (!roomId) return
+		if (file.size > MAX_ATTACHMENT_BYTES) {
+			throw new Error('attachment_too_large')
+		}
+		const txn = options?.transactionId ?? transactionId()
+		const kind = attachmentKind(file.type)
+		const localUrl = kind === 'image' ? URL.createObjectURL(file) : undefined
+		const optimistic: ChatMessage = {
+			id: txn,
+			sender: status.value?.matrixUserId ?? '',
+			senderName: status.value?.displayName || undefined,
+			body: '',
+			timestamp: Date.now(),
+			status: 'sending',
+			transactionId: txn,
+			attachment: { kind, mxcUrl: localUrl ?? '', filename: file.name, mimeType: file.type || null, size: file.size },
+		}
+		rooms.value = rooms.value.map((room) => room.id === roomId
+			? { ...room, events: [...room.events, optimistic], lastMessage: optimistic }
+			: room)
+		try {
+			const sent = await sendAttachment(roomId, file, txn)
+			if (localUrl) URL.revokeObjectURL(localUrl)
+			rooms.value = rooms.value.map((room) => room.id === roomId
+				? { ...room, events: room.events.map((message) => message.id === txn ? { ...message, id: sent.eventId, status: 'sent', attachment: sent.attachment } : message) }
+				: room)
+			if (!sent.eventId.startsWith('nc-')) {
+				void setFullyRead(roomId, sent.eventId).catch((error) => console.warn('Failed to mark room read', error))
+			}
+		} catch (caught) {
+			if (localUrl) URL.revokeObjectURL(localUrl)
+			rooms.value = rooms.value.map((room) => room.id === roomId
+				? { ...room, events: room.events.map((message) => message.id === txn ? { ...message, status: 'failed' } : message) }
+				: room)
+			throw caught
+		}
+	}
+
 	async function react(message: ChatMessage, emoji: string) {
 		const roomId = activeRoomId.value
 		if (!roomId || message.id.startsWith('nc-')) return
@@ -244,7 +293,7 @@ export function useChat() {
 	}
 
 	async function retry(message: ChatMessage) {
-		if (message.status !== 'failed') return
+		if (message.status !== 'failed' || message.attachment) return
 		const roomId = activeRoomId.value
 		if (!roomId) return
 		rooms.value = rooms.value.map((room) => room.id === roomId
@@ -586,6 +635,7 @@ export function useChat() {
 		focusMessage,
 		startDirectChat,
 		send,
+		sendFile,
 		setTyping,
 		retry,
 		react,

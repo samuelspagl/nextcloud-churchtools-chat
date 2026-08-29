@@ -1,6 +1,7 @@
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import type {
+	ChatAttachment,
 	ChatMessage,
 	ChatStatus,
 	ConversationSearchResponse,
@@ -82,6 +83,17 @@ export async function sendMessage(roomId: string, body: string, transactionId: s
 	const response = await axios.post<ApiEnvelope<{ eventId: string; transactionId: string }>>(
 		endpoint(`/api/rooms/${encodeURIComponent(roomId)}/messages`),
 		{ body, transactionId, replyTo },
+	)
+	return response.data.data
+}
+
+export async function sendAttachment(roomId: string, file: File, transactionId: string): Promise<{ eventId: string; transactionId: string; attachment: ChatAttachment }> {
+	const form = new FormData()
+	form.append('file', file)
+	form.append('transactionId', transactionId)
+	const response = await axios.post<ApiEnvelope<{ eventId: string; transactionId: string; attachment: ChatAttachment }>>(
+		endpoint(`/api/rooms/${encodeURIComponent(roomId)}/attachments`),
+		form,
 	)
 	return response.data.data
 }

@@ -103,7 +103,11 @@ OC.L10N.register(
 		"Attachment actions": "Anhangsaktionen",
 		"Download attachment": "Anhang herunterladen",
 		"Save to Nextcloud": "In Nextcloud speichern",
-		"Saved to {path}": "In {path} gespeichert"
+		"Saved to {path}": "In {path} gespeichert",
+		"Attach file": "Datei anhängen",
+		"Drop files here to add them to your message": "Dateien hier ablegen, um sie zur Nachricht hinzuzufügen",
+		"Remove attachment": "Anhang entfernen",
+		"{filename} is too large to send.": "{filename} ist zu groß zum Senden."
 	},
 	"nplurals=2; plural=(n != 1);"
 );

@@ -13,7 +13,7 @@ use Throwable;
 final class MatrixClient {
 	private const AVATAR_SIZE = 128;
 	private const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
-	private const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
+	public const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
 	private const IMAGE_CONTENT_TYPES = [
 		'image/jpeg',
 		'image/png',
@@ -355,6 +355,51 @@ final class MatrixClient {
 		}
 	}
 
+	/** @return array{contentUri:string} */
+	public function uploadMedia(string $accessToken, string $contents, string $contentType, string $filename): array {
+		if (strlen($contents) > self::MAX_MEDIA_BYTES) {
+			throw new IntegrationException('matrix_media_too_large', 'The attachment is too large.', 413);
+		}
+		$path = '/_matrix/media/v3/upload?' . http_build_query(['filename' => $filename]);
+		$options = [
+			'headers' => [
+				'Accept' => 'application/json',
+				'Content-Type' => $contentType,
+				'Authorization' => 'Bearer ' . $accessToken,
+			],
+			'body' => $contents,
+			'connect_timeout' => 5,
+			'timeout' => 60,
+			'http_errors' => false,
+		];
+
+		try {
+			$response = $this->clientService->newClient()->post($this->baseUrl() . $path, $options);
+			$status = $response->getStatusCode();
+			$data = json_decode((string)$response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+			if (!is_array($data)) {
+				$data = [];
+			}
+			if ($status === 401 || $status === 403) {
+				throw new IntegrationException('matrix_session_expired', 'The Matrix session is unavailable or expired.', 401);
+			}
+			if ($status < 200 || $status >= 300) {
+				throw new IntegrationException('matrix_media_upload_failed', 'Matrix could not accept the attachment.', 502);
+			}
+			$contentUri = is_string($data['content_uri'] ?? null) ? $data['content_uri'] : '';
+			if ($contentUri === '') {
+				throw new IntegrationException('matrix_media_upload_failed', 'Matrix did not return an attachment location.', 502);
+			}
+			return ['contentUri' => $contentUri];
+		} catch (IntegrationException $e) {
+			throw $e;
+		} catch (JsonException) {
+			throw new IntegrationException('invalid_matrix_response', 'Matrix returned malformed JSON.', 502);
+		} catch (Throwable) {
+			throw new IntegrationException('matrix_unavailable', 'Matrix is currently unavailable.', 502);
+		}
+	}
+
 	public function createDirectRoom(string $accessToken, string $targetUserId): string {
 		$result = $this->request('POST', '/_matrix/client/v3/createRoom', $accessToken, [
 			'preset' => 'trusted_private_chat',
@@ -392,6 +437,16 @@ final class MatrixClient {
 			'/_matrix/client/v3/rooms/' . rawurlencode($roomId) . '/send/m.room.message/' . rawurlencode($transactionId),
 			$accessToken,
 			$content,
+		);
+	}
+
+	/** @param array{mimetype:string,size:int} $info @return array<string,mixed> */
+	public function sendAttachmentMessage(string $accessToken, string $roomId, string $transactionId, string $msgtype, string $mxcUrl, string $filename, array $info): array {
+		return $this->request(
+			'PUT',
+			'/_matrix/client/v3/rooms/' . rawurlencode($roomId) . '/send/m.room.message/' . rawurlencode($transactionId),
+			$accessToken,
+			['msgtype' => $msgtype, 'body' => $filename, 'url' => $mxcUrl, 'info' => $info],
 		);
 	}
 

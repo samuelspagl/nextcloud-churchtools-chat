@@ -67,9 +67,9 @@ const NcActionButtonStub = defineComponent({
 	template: '<button type="button" @click="$emit(\'click\')"><slot name="icon" /><slot /></button>',
 })
 
-function mountComposer(disabled = false) {
+function mountComposer(disabled = false, pendingFiles: File[] = []) {
 	return mount(MessageComposer, {
-		props: { disabled },
+		props: { disabled, pendingFiles },
 		global: {
 			stubs: {
 				NcActionButton: NcActionButtonStub,
@@ -149,5 +149,38 @@ describe('MessageComposer', () => {
 		await wrapper.findComponent(NcEmojiPickerStub).vm.$emit('select', '👍')
 
 		expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('👍')
+	})
+
+	it('enables the send button with only pending files and emits sendFiles without emitting send', async () => {
+		const file = new File(['content'], 'notes.pdf', { type: 'application/pdf' })
+		const wrapper = mountComposer(false, [file])
+		const sendButton = wrapper.get('button[aria-label="Send message"]')
+		expect(sendButton.attributes('disabled')).toBeUndefined()
+
+		await wrapper.get('form').trigger('submit')
+
+		expect(wrapper.emitted('sendFiles')).toEqual([[[file]]])
+		expect(wrapper.emitted('send')).toBeUndefined()
+	})
+
+	it('emits both send and sendFiles when text and pending files are both present', async () => {
+		const file = new File(['content'], 'notes.pdf', { type: 'application/pdf' })
+		const wrapper = mountComposer(false, [file])
+
+		await wrapper.get('textarea').setValue('hello')
+		await wrapper.get('form').trigger('submit')
+
+		expect(wrapper.emitted('sendFiles')).toEqual([[[file]]])
+		expect(wrapper.emitted('send')).toEqual([['hello']])
+	})
+
+	it('renders staged attachments and emits removePendingFile when a chip is removed', async () => {
+		const file = new File(['content'], 'notes.pdf', { type: 'application/pdf' })
+		const wrapper = mountComposer(false, [file])
+
+		expect(wrapper.text()).toContain('notes.pdf')
+		await wrapper.get('.pending-attachment__remove').trigger('click')
+
+		expect(wrapper.emitted('removePendingFile')).toEqual([[file]])
 	})
 })

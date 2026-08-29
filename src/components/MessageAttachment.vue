@@ -11,9 +11,13 @@ const emit = defineEmits<{ save: [attachment: ChatAttachment] }>()
 
 const previewOpen = shallowRef(false)
 const isImage = computed(() => props.attachment.kind === 'image')
-const thumbnailUrl = computed(() => attachmentThumbnailUrl(props.attachment.mxcUrl))
-const downloadUrl = computed(() => attachmentDownloadUrl(props.attachment.mxcUrl, props.attachment.filename))
-const viewUrl = computed(() => attachmentViewUrl(props.attachment.mxcUrl))
+// While an attachment is still uploading, mxcUrl is either a local blob:
+// preview (images) or empty (other files), not a real mxc:// URI, so it
+// can't be routed through the backend media endpoints yet.
+const isPending = computed(() => !props.attachment.mxcUrl.startsWith('mxc://'))
+const thumbnailUrl = computed(() => isPending.value ? props.attachment.mxcUrl : attachmentThumbnailUrl(props.attachment.mxcUrl))
+const downloadUrl = computed(() => isPending.value ? undefined : attachmentDownloadUrl(props.attachment.mxcUrl, props.attachment.filename))
+const viewUrl = computed(() => isPending.value ? props.attachment.mxcUrl : attachmentViewUrl(props.attachment.mxcUrl))
 const sizeLabel = computed(() => formatFileSize(props.attachment.size))
 const typeLabel = computed(() => props.attachment.mimeType || props.attachment.kind)
 const fileIcon = computed(() => {
@@ -38,14 +42,14 @@ function openPreview() {
 		<button v-if="isImage" class="attachment__image" type="button" :aria-label="t('churchtools_chat', 'Open image {filename}', { filename: attachment.filename })" @click="openPreview">
 			<img :src="thumbnailUrl" :alt="attachment.filename">
 		</button>
-		<a v-else class="attachment__file" :href="downloadUrl" :download="attachment.filename">
+		<component :is="downloadUrl ? 'a' : 'div'" class="attachment__file" :href="downloadUrl" :download="downloadUrl ? attachment.filename : undefined">
 			<span class="attachment__icon" aria-hidden="true">{{ fileIcon }}</span>
 			<span class="attachment__details"><strong>{{ attachment.filename }}</strong><small>{{ typeLabel }}<template v-if="sizeLabel"> · {{ sizeLabel }}</template></small></span>
-		</a>
+		</component>
 		<NcDialog v-if="previewOpen" :name="attachment.filename" size="large" @closing="previewOpen = false">
 			<div class="attachment__dialog"><img :src="viewUrl" :alt="attachment.filename"></div>
 			<template #actions>
-				<NcButton variant="secondary" :disabled="saving" @click="emit('save', attachment)">{{ t('churchtools_chat', 'Save to Nextcloud') }}</NcButton>
+				<NcButton variant="secondary" :disabled="saving || isPending" @click="emit('save', attachment)">{{ t('churchtools_chat', 'Save to Nextcloud') }}</NcButton>
 			</template>
 		</NcDialog>
 	</div>

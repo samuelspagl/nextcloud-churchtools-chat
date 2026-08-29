@@ -247,6 +247,60 @@ final class ChatGateway {
 		];
 	}
 
+	/** @return array{eventId:string,transactionId:string,attachment:array{kind:string,mxcUrl:string,filename:string,mimeType:string|null,size:int|null}} */
+	public function sendAttachment(string $userId, string $roomId, string $contents, string $contentType, string $filename, ?string $transactionId): array {
+		$this->assertRoomId($roomId);
+		if ($contents === '' || strlen($contents) > MatrixClient::MAX_MEDIA_BYTES) {
+			throw new IntegrationException('matrix_media_too_large', 'The attachment is too large.', 413);
+		}
+		$filename = $this->sanitizeAttachmentFilename($filename);
+		$contentType = trim($contentType) !== '' ? trim($contentType) : 'application/octet-stream';
+		$msgtype = match (true) {
+			str_starts_with($contentType, 'image/') => 'm.image',
+			str_starts_with($contentType, 'audio/') => 'm.audio',
+			str_starts_with($contentType, 'video/') => 'm.video',
+			default => 'm.file',
+		};
+		$transactionId = $transactionId !== null && preg_match('/^[A-Za-z0-9._-]{8,128}$/', $transactionId)
+			? $transactionId
+			: bin2hex(random_bytes(16));
+
+		$accessToken = $this->requireMatrixToken($userId);
+		$upload = $this->matrix->uploadMedia($accessToken, $contents, $contentType, $filename);
+		$size = strlen($contents);
+		$result = $this->matrix->sendAttachmentMessage(
+			$accessToken,
+			$roomId,
+			$transactionId,
+			$msgtype,
+			$upload['contentUri'],
+			$filename,
+			['mimetype' => $contentType, 'size' => $size],
+		);
+
+		return [
+			'eventId' => (string)($result['event_id'] ?? ''),
+			'transactionId' => $transactionId,
+			'attachment' => [
+				'kind' => substr($msgtype, 2),
+				'mxcUrl' => $upload['contentUri'],
+				'filename' => $filename,
+				'mimeType' => $contentType,
+				'size' => $size,
+			],
+		];
+	}
+
+	private function sanitizeAttachmentFilename(string $filename): string {
+		$filename = basename(trim($filename));
+		$filename = preg_replace('/[\x00-\x1f\x7f]/', '', $filename) ?? '';
+		$filename = mb_substr($filename, 0, 255);
+		if ($filename === '') {
+			throw new IntegrationException('invalid_attachment', 'The attachment must have a valid file name.', 400);
+		}
+		return $filename;
+	}
+
 	/** @return array{eventId:string,transactionId:string} */
 	public function react(string $userId, string $roomId, string $eventId, string $emoji, ?string $transactionId): array {
 		$this->assertRoomId($roomId);

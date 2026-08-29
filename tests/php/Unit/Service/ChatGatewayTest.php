@@ -311,6 +311,145 @@ final class ChatGatewayTest extends TestCase {
 		self::assertSame('$edited:chat.church.tools', $result['eventId']);
 	}
 
+	/** @dataProvider attachmentContentTypes */
+	public function testSendAttachmentDerivesMsgtypeFromContentType(string $contentType, string $expectedMsgtype, string $expectedKind): void {
+		$gateway = $this->createAttachmentGateway($expectedMsgtype);
+
+		$result = $gateway->sendAttachment('user', '!room:chat.church.tools', 'file-bytes', $contentType, 'notes.pdf', null);
+
+		self::assertSame('$attachment:chat.church.tools', $result['eventId']);
+		self::assertSame($expectedKind, $result['attachment']['kind']);
+		self::assertSame('mxc://chat.church.tools/AbC123', $result['attachment']['mxcUrl']);
+		self::assertSame('notes.pdf', $result['attachment']['filename']);
+		self::assertSame($contentType, $result['attachment']['mimeType']);
+		self::assertSame(strlen('file-bytes'), $result['attachment']['size']);
+	}
+
+	/** @return iterable<string,array{string,string,string}> */
+	public static function attachmentContentTypes(): iterable {
+		yield 'image' => ['image/png', 'm.image', 'image'];
+		yield 'audio' => ['audio/mpeg', 'm.audio', 'audio'];
+		yield 'video' => ['video/mp4', 'm.video', 'video'];
+		yield 'other' => ['application/pdf', 'm.file', 'file'];
+	}
+
+	public function testSendAttachmentSanitizesFilename(): void {
+		$gateway = $this->createAttachmentGateway('m.file', 'passwd');
+
+		$result = $gateway->sendAttachment('user', '!room:chat.church.tools', 'file-bytes', 'application/octet-stream', '../../etc/passwd', null);
+
+		self::assertSame('passwd', $result['attachment']['filename']);
+	}
+
+	public function testSendAttachmentRejectsOversizedContentWithoutMakingARequest(): void {
+		$config = $this->createMock(IConfig::class);
+		$httpClient = $this->createMock(IClient::class);
+		$httpClient->expects(self::never())->method('post');
+		$httpClient->expects(self::never())->method('put');
+		$clientService = $this->createMock(IClientService::class);
+		$clientService->method('newClient')->willReturn($httpClient);
+		$appConfig = $this->createMock(\OCP\IConfig::class);
+		$appConfig->method('getAppValue')->willReturnCallback(
+			static fn (string $appId, string $key, string $default = ''): string => $default,
+		);
+		$appConfigService = new AppConfigService($appConfig, new TenantUrlValidator());
+		$matrixUserId = new MatrixUserId($appConfigService);
+		$gateway = new ChatGateway(
+			new SecretService($config, $this->createMock(ICrypto::class)),
+			new ChurchToolsClient($clientService),
+			new MatrixClient($clientService, $matrixUserId, $appConfigService),
+			$matrixUserId,
+			new MatrixRoomMapper(),
+			$appConfigService,
+			$this->createMock(LoggerInterface::class),
+		);
+
+		$this->expectException(\OCA\ChurchToolsChat\Exception\IntegrationException::class);
+		$gateway->sendAttachment('user', '!room:chat.church.tools', str_repeat('x', MatrixClient::MAX_MEDIA_BYTES + 1), 'application/pdf', 'notes.pdf', null);
+	}
+
+	public function testSendAttachmentRejectsInvalidRoomId(): void {
+		$config = $this->createMock(IConfig::class);
+		$httpClient = $this->createMock(IClient::class);
+		$clientService = $this->createMock(IClientService::class);
+		$clientService->method('newClient')->willReturn($httpClient);
+		$appConfig = $this->createMock(\OCP\IConfig::class);
+		$appConfig->method('getAppValue')->willReturnCallback(
+			static fn (string $appId, string $key, string $default = ''): string => $default,
+		);
+		$appConfigService = new AppConfigService($appConfig, new TenantUrlValidator());
+		$matrixUserId = new MatrixUserId($appConfigService);
+		$gateway = new ChatGateway(
+			new SecretService($config, $this->createMock(ICrypto::class)),
+			new ChurchToolsClient($clientService),
+			new MatrixClient($clientService, $matrixUserId, $appConfigService),
+			$matrixUserId,
+			new MatrixRoomMapper(),
+			$appConfigService,
+			$this->createMock(LoggerInterface::class),
+		);
+
+		$this->expectException(\OCA\ChurchToolsChat\Exception\IntegrationException::class);
+		$gateway->sendAttachment('user', 'not-a-room-id', 'file-bytes', 'application/pdf', 'notes.pdf', null);
+	}
+
+	private function createAttachmentGateway(string $expectedMsgtype, string $expectedFilename = 'notes.pdf'): ChatGateway {
+		$config = $this->createMock(IConfig::class);
+		$config->method('getUserValue')->willReturnCallback(
+			static fn (string $userId, string $appId, string $key, string $default): string => match ($key) {
+				'matrix_access_token' => 'encrypted-matrix-token',
+				default => $default,
+			},
+		);
+		$crypto = $this->createMock(ICrypto::class);
+		$crypto->method('decrypt')->willReturnCallback(static fn (string $value): string => match ($value) {
+			'encrypted-matrix-token' => 'matrix-token',
+			default => '',
+		});
+		$uploadResponse = $this->createMock(IResponse::class);
+		$uploadResponse->method('getStatusCode')->willReturn(200);
+		$uploadResponse->method('getBody')->willReturn(json_encode(['content_uri' => 'mxc://chat.church.tools/AbC123'], JSON_THROW_ON_ERROR));
+		$sendResponse = $this->createMock(IResponse::class);
+		$sendResponse->method('getStatusCode')->willReturn(200);
+		$sendResponse->method('getBody')->willReturn(json_encode(['event_id' => '$attachment:chat.church.tools'], JSON_THROW_ON_ERROR));
+		$httpClient = $this->createMock(IClient::class);
+		$httpClient->method('post')->willReturnCallback(
+			static function (string $url, array $options) use ($uploadResponse): IResponse {
+				self::assertStringStartsWith('https://chat.church.tools/_matrix/media/v3/upload?', $url);
+				self::assertSame('Bearer matrix-token', $options['headers']['Authorization']);
+				return $uploadResponse;
+			},
+		);
+		$httpClient->method('put')->willReturnCallback(
+			static function (string $url, array $options) use ($sendResponse, $expectedMsgtype, $expectedFilename): IResponse {
+				self::assertStringContainsString('/send/m.room.message/', $url);
+				$body = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
+				self::assertSame($expectedMsgtype, $body['msgtype']);
+				self::assertSame($expectedFilename, $body['body']);
+				self::assertSame('mxc://chat.church.tools/AbC123', $body['url']);
+				return $sendResponse;
+			},
+		);
+		$clientService = $this->createMock(IClientService::class);
+		$clientService->method('newClient')->willReturn($httpClient);
+		$appConfig = $this->createMock(\OCP\IConfig::class);
+		$appConfig->method('getAppValue')->willReturnCallback(
+			static fn (string $appId, string $key, string $default = ''): string => $default,
+		);
+		$appConfigService = new AppConfigService($appConfig, new TenantUrlValidator());
+		$matrixUserId = new MatrixUserId($appConfigService);
+
+		return new ChatGateway(
+			new SecretService($config, $crypto),
+			new ChurchToolsClient($clientService),
+			new MatrixClient($clientService, $matrixUserId, $appConfigService),
+			$matrixUserId,
+			new MatrixRoomMapper(),
+			$appConfigService,
+			$this->createMock(LoggerInterface::class),
+		);
+	}
+
 	public function testGetMessageFetchesEventAndResolvesSender(): void {
 		$gateway = $this->createMessageGateway();
 

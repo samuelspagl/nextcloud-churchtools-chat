@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
 	sendMessage: vi.fn(),
+	sendAttachment: vi.fn(),
 	getMessages: vi.fn(),
 	getEvent: vi.fn(),
 	setFullyRead: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock('../../src/services/chatApi', async (importActual) => {
 	return {
 		...actual,
 		sendMessage: mocks.sendMessage,
+		sendAttachment: mocks.sendAttachment,
 		getMessages: mocks.getMessages,
 		getEvent: mocks.getEvent,
 		setFullyRead: mocks.setFullyRead,
@@ -128,6 +130,38 @@ describe('useChat send/retry', () => {
 
 		expect(mocks.sendMessage).toHaveBeenCalledTimes(2)
 		expect(mocks.sendMessage.mock.calls[1][2]).toBe(txn)
+	})
+
+	it('optimistically adds a file message and reconciles it on success', async () => {
+		mocks.sendAttachment.mockResolvedValue({
+			eventId: '$event',
+			transactionId: 'txn-file',
+			attachment: { kind: 'file', mxcUrl: 'mxc://server/media', filename: 'notes.pdf', mimeType: 'application/pdf', size: 7 },
+		})
+		const chat = useChat()
+		chat.rooms.value = [{ ...room, events: [] }]
+		await chat.selectRoom('!room:test')
+
+		const file = new File(['content'], 'notes.pdf', { type: 'application/pdf' })
+		await chat.sendFile(file, { transactionId: 'txn-file' })
+
+		expect(mocks.sendAttachment).toHaveBeenCalledWith('!room:test', file, 'txn-file')
+		const message = chat.rooms.value[0].events.find((m) => m.id === '$event')
+		expect(message?.status).toBe('sent')
+		expect(message?.attachment).toEqual({ kind: 'file', mxcUrl: 'mxc://server/media', filename: 'notes.pdf', mimeType: 'application/pdf', size: 7 })
+	})
+
+	it('marks a file message as failed when the upload rejects', async () => {
+		mocks.sendAttachment.mockRejectedValueOnce(new Error('upload failed'))
+		const chat = useChat()
+		chat.rooms.value = [{ ...room, events: [] }]
+		await chat.selectRoom('!room:test')
+
+		const file = new File(['content'], 'notes.pdf', { type: 'application/pdf' })
+		await expect(chat.sendFile(file, { transactionId: 'txn-file' })).rejects.toThrow('upload failed')
+
+		const failed = chat.rooms.value[0].events.find((m) => m.transactionId === 'txn-file')
+		expect(failed?.status).toBe('failed')
 	})
 
 	it('fetches reply targets that are not loaded in the timeline', async () => {

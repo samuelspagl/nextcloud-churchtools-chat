@@ -423,6 +423,99 @@ final class MatrixClientTest extends TestCase {
 		$this->matrix->redact('secret-token', '!room:chat.church.tools', '$target:chat.church.tools', 'nc-txn');
 	}
 
+	public function testUploadsMediaAndReturnsContentUri(): void {
+		$this->response->method('getStatusCode')->willReturn(200);
+		$this->response->method('getBody')->willReturn(json_encode(['content_uri' => 'mxc://chat.church.tools/AbC123'], JSON_THROW_ON_ERROR));
+		$this->httpClient
+			->expects(self::once())
+			->method('post')
+			->with(
+				self::callback(static function (string $url): bool {
+					self::assertStringStartsWith('https://chat.church.tools/_matrix/media/v3/upload?', $url);
+					parse_str((string)parse_url($url, PHP_URL_QUERY), $query);
+					self::assertSame('notes.pdf', $query['filename']);
+					return true;
+				}),
+				self::callback(static function (array $options): bool {
+					self::assertSame('Bearer secret-token', $options['headers']['Authorization']);
+					self::assertSame('application/pdf', $options['headers']['Content-Type']);
+					self::assertSame('file-bytes', $options['body']);
+					return true;
+				}),
+			)
+			->willReturn($this->response);
+
+		$result = $this->matrix->uploadMedia('secret-token', 'file-bytes', 'application/pdf', 'notes.pdf');
+
+		self::assertSame('mxc://chat.church.tools/AbC123', $result['contentUri']);
+	}
+
+	public function testRejectsUploadOverMaxMediaBytes(): void {
+		$this->httpClient->expects(self::never())->method('post');
+
+		$this->assertIntegrationError(
+			fn (): array => $this->matrix->uploadMedia('secret-token', str_repeat('x', MatrixClient::MAX_MEDIA_BYTES + 1), 'application/pdf', 'notes.pdf'),
+			'matrix_media_too_large',
+			413,
+		);
+	}
+
+	public function testUploadMapsSessionExpiredOnAuthFailure(): void {
+		$this->response->method('getStatusCode')->willReturn(401);
+		$this->response->method('getBody')->willReturn('{}');
+		$this->httpClient->method('post')->willReturn($this->response);
+
+		$this->assertIntegrationError(
+			fn (): array => $this->matrix->uploadMedia('secret-token', 'bytes', 'application/pdf', 'notes.pdf'),
+			'matrix_session_expired',
+			401,
+		);
+	}
+
+	public function testUploadMapsNonSuccessStatus(): void {
+		$this->response->method('getStatusCode')->willReturn(500);
+		$this->response->method('getBody')->willReturn('{}');
+		$this->httpClient->method('post')->willReturn($this->response);
+
+		$this->assertIntegrationError(
+			fn (): array => $this->matrix->uploadMedia('secret-token', 'bytes', 'application/pdf', 'notes.pdf'),
+			'matrix_media_upload_failed',
+			502,
+		);
+	}
+
+	public function testSendsAttachmentMessageWithMsgtypeAndInfo(): void {
+		$this->response->method('getStatusCode')->willReturn(200);
+		$this->response->method('getBody')->willReturn(json_encode(['event_id' => '$attachment:chat.church.tools'], JSON_THROW_ON_ERROR));
+		$this->httpClient
+			->expects(self::once())
+			->method('put')
+			->with(
+				self::callback(static fn (string $url): bool => str_contains($url, '/send/m.room.message/nc-txn')),
+				self::callback(static function (array $options): bool {
+					$body = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
+					self::assertSame('m.file', $body['msgtype']);
+					self::assertSame('notes.pdf', $body['body']);
+					self::assertSame('mxc://chat.church.tools/AbC123', $body['url']);
+					self::assertSame(['mimetype' => 'application/pdf', 'size' => 7], $body['info']);
+					return true;
+				}),
+			)
+			->willReturn($this->response);
+
+		$result = $this->matrix->sendAttachmentMessage(
+			'secret-token',
+			'!room:chat.church.tools',
+			'nc-txn',
+			'm.file',
+			'mxc://chat.church.tools/AbC123',
+			'notes.pdf',
+			['mimetype' => 'application/pdf', 'size' => 7],
+		);
+
+		self::assertSame('$attachment:chat.church.tools', $result['event_id']);
+	}
+
 	public function testSurfacesMatrixErrorCodeAndMessage(): void {
 		$this->response->method('getStatusCode')->willReturn(404);
 		$this->response->method('getBody')->willReturn(json_encode([

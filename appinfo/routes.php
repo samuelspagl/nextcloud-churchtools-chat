@@ -25,6 +25,7 @@ return [
 		['name' => 'chat#messages', 'url' => '/api/rooms/{roomId}/messages', 'verb' => 'GET'],
 		['name' => 'chat#message', 'url' => '/api/rooms/{roomId}/messages/{eventId}', 'verb' => 'GET'],
 		['name' => 'chat#send', 'url' => '/api/rooms/{roomId}/messages', 'verb' => 'POST'],
+		['name' => 'chat#sendAttachment', 'url' => '/api/rooms/{roomId}/attachments', 'verb' => 'POST'],
 		['name' => 'chat#react', 'url' => '/api/rooms/{roomId}/messages/{eventId}/reactions', 'verb' => 'POST'],
 		['name' => 'chat#edit', 'url' => '/api/rooms/{roomId}/messages/{eventId}', 'verb' => 'PUT'],
 		['name' => 'chat#redact', 'url' => '/api/rooms/{roomId}/messages/{eventId}/redact', 'verb' => 'POST'],
