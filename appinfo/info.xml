@@ -26,7 +26,7 @@ ChurchTools Chat brings [ChurchTools](https://church.tools) chat into Nextcloud 
 3. Each user then opens **Personal settings → Additional settings** and connects their own ChurchTools account.
 
 📖 See the [README](https://github.com/samuelspagl/nextcloud-churchtools-chat#readme) for full setup and security details.]]></description>
-    <version>0.7.4</version>
+    <version>0.7.5</version>
     <licence>AGPL-3.0-or-later</licence>
     <author>Samuel Spagl</author>
     <namespace>ChurchToolsChat</namespace>
@@ -34,6 +34,10 @@ ChurchTools Chat brings [ChurchTools](https://church.tools) chat into Nextcloud 
     <website>https://github.com/samuelspagl/nextcloud-churchtools-chat</website>
     <bugs>https://github.com/samuelspagl/nextcloud-churchtools-chat/issues</bugs>
     <repository type="git">https://github.com/samuelspagl/nextcloud-churchtools-chat.git</repository>
+    <screenshot small-thumbnail="https://raw.githubusercontent.com/samuelspagl/nextcloud-churchtools-chat/main/docs/screenshots/conversations.png">https://raw.githubusercontent.com/samuelspagl/nextcloud-churchtools-chat/main/docs/screenshots/conversations.png</screenshot>
+    <screenshot small-thumbnail="https://raw.githubusercontent.com/samuelspagl/nextcloud-churchtools-chat/main/docs/screenshots/chat.png">https://raw.githubusercontent.com/samuelspagl/nextcloud-churchtools-chat/main/docs/screenshots/chat.png</screenshot>
+    <screenshot small-thumbnail="https://raw.githubusercontent.com/samuelspagl/nextcloud-churchtools-chat/main/docs/screenshots/room-info.png">https://raw.githubusercontent.com/samuelspagl/nextcloud-churchtools-chat/main/docs/screenshots/room-info.png</screenshot>
+    <screenshot small-thumbnail="https://raw.githubusercontent.com/samuelspagl/nextcloud-churchtools-chat/main/docs/screenshots/group-info.png">https://raw.githubusercontent.com/samuelspagl/nextcloud-churchtools-chat/main/docs/screenshots/group-info.png</screenshot>
     <documentation>
         <user>https://github.com/samuelspagl/nextcloud-churchtools-chat#readme</user>
         <admin>https://github.com/samuelspagl/nextcloud-churchtools-chat#readme</admin>
