@@ -130,21 +130,22 @@ const newChatIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h1
 </template>
 
 <style scoped>
-.conversation-sidebar { display: flex; height: 100%; flex-direction: column; background: var(--color-main-background); }
-.conversation-sidebar__heading { display: grid; gap: 12px; padding: 16px; border-bottom: 1px solid var(--color-border); }
+.conversation-sidebar { display: flex; min-height: 0; block-size: 100%; flex-direction: column; overflow: hidden; background: var(--color-main-background); }
+.conversation-sidebar__heading { display: grid; flex: 0 0 auto; gap: 12px; padding: 16px; border-bottom: 1px solid var(--color-border); }
 .conversation-sidebar__heading h1 { margin: 0; font-size: 20px; }
 .conversation-sidebar__title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .conversation-sidebar__state { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 120px; color: var(--color-text-maxcontrast); }
 .conversation-sidebar__state--search { min-height: 48px; padding: 8px 16px; }
 .conversation-sidebar__error { margin: 0; padding: 8px 16px; border-top: 1px solid var(--color-border); color: var(--color-error-text); font-size: 13px; }
-.conversation-list { min-height: 0; flex: 1; overflow-y: auto; margin: 0; padding: 8px; list-style: none; }
-.conversation { display: flex; width: 100%; min-height: 64px; align-items: center; gap: 10px; padding: 8px; border: 0; border-radius: var(--border-radius-large); color: var(--color-main-text); background: transparent; text-align: start; cursor: pointer; }
+.conversation-list { min-height: 0; flex: 1 1 0; overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 8px; list-style: none; }
+.conversation { display: flex; width: 100%; min-height: 64px; align-items: center; gap: 10px; padding: 8px; border: 0; border-radius: var(--border-radius-large); color: var(--color-main-text); background: transparent; font-weight: normal; text-align: start; cursor: pointer; }
 .conversation:hover, .conversation:focus-visible { background: var(--color-background-hover); }
 .conversation:focus-visible { outline: 2px solid var(--color-primary-element); outline-offset: -2px; }
 .conversation--active { background: var(--color-primary-element-light); }
 .conversation__body { min-width: 0; flex: 1; }
 .conversation__topline { display: flex; justify-content: space-between; gap: 8px; }
 .conversation__topline strong, .conversation__preview { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.conversation__topline strong { font-weight: 600; }
 .conversation__topline time { color: var(--color-text-maxcontrast); font-size: 12px; }
 .conversation__preview { display: block; color: var(--color-text-maxcontrast); font-size: 13px; }
 .conversation__preview--typing { color: var(--color-primary-element); font-style: italic; }

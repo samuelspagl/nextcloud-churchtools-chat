@@ -11,16 +11,23 @@ direct conversation for the selected person.
 
 ## Current integration boundary
 
-The published ChurchTools OpenAPI exposes chat metadata at `/api/chat`, but no
-message transport or Matrix token-exchange endpoint. The app validates and
+The published ChurchTools OpenAPI exposes administrator-only chat metadata at
+`/api/chat`, but no message transport or Matrix token-exchange endpoint. Reading
+that endpoint requires the broad `administer persons` or `administer settings`
+permission, so it is not part of normal user requests. The app validates and
 stores each user's ChurchTools login token separately. To obtain a Matrix
 session, users enter only their CT Chat password. The Matrix user ID is derived
-from the GUID returned by `/api/whoami`: the GUID is normalized to lowercase
-and formatted as `@ct_<guid>:<matrix-server-name>`, where the Matrix server name
-is the host of the homeserver URL configured by the administrator. The derived ID
+from the GUID returned by `/api/whoami`: the GUID is normalized to lowercase and
+formatted as `@ct_<guid>:<matrix-server-name>`, where the Matrix server name is
+the host of the homeserver URL configured by the administrator. The derived ID
 and password are sent once to `POST <matrix-homeserver>/_matrix/client/v3/login`;
-the password is not persisted. Only the returned Matrix access token, user ID and
-device ID are kept. The app never treats the API token as a Matrix password.
+the password is not persisted. Only the returned Matrix access token, user ID
+and device ID are kept. The app never treats the API token as a Matrix password.
+
+Matrix canonical aliases can identify a ChurchTools chat type and chat-specific
+GUID, but they do not contain the numeric ChurchTools group or event ID. Future
+group or event linking must use APIs available under the connected user's own
+permissions and must not make `/api/chat` a runtime dependency.
 
 ## Starting a direct chat
 
@@ -72,23 +79,33 @@ publish an existing release manually.
 ## Local Docker test stack
 
 The included Compose stack runs Nextcloud 34 with PostgreSQL and Redis, mounts
-this repository as the local `churchtools_chat` app, and enables it during
+the release-like `.build/churchtools_chat` staging directory as the local app,
+and enables it during
 Nextcloud startup. On the first start it also downloads and enables Deck, Talk,
 Tables, and the OpenStreetMap integration. Together with the bundled Files and
 Profile apps, these provide a useful dynamic Smart Picker test set. The first
 startup therefore needs access to the Nextcloud App Store and can take longer.
 Downloaded provider apps are kept in a dedicated `nextcloud_custom_apps`
 volume; a one-shot init service gives Nextcloud's web-server user access to
-that volume, while the local ChurchTools Chat source remains mounted read-only
-inside it.
+that volume, while only the staged, installable ChurchTools Chat app is mounted
+read-only inside it. Source files, tests, and Node dependencies are not exposed
+to the container.
 
 Build the frontend assets and start the stack:
 
 ```sh
 corepack pnpm install --frozen-lockfile
-pnpm build
+pnpm build:docker
 cp .env.example .env
 docker compose up -d --wait
+```
+
+After changing the source, rebuild the staging directory and recreate the app
+container so its bind mount is refreshed:
+
+```sh
+pnpm build:docker
+docker compose up -d --force-recreate app
 ```
 
 Open <http://localhost:8080> and sign in with `admin` / `admin`, unless those

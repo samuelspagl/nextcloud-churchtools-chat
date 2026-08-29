@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OCA\ChurchToolsChat\Tests\Unit\Service;
 
+use OCA\ChurchToolsChat\Exception\IntegrationException;
 use OCA\ChurchToolsChat\Service\ChurchToolsClient;
 use OCP\Http\Client\IClient;
 use OCP\Http\Client\IClientService;
@@ -62,5 +63,31 @@ final class ChurchToolsClientTest extends TestCase {
 		$raw = $this->client->getChatsRaw('https://tenant.church.tools', 'token');
 
 		self::assertSame([['guid' => 'X', 'extraField' => 'keep']], $raw);
+	}
+
+	public function testUnauthorizedResponseMeansInvalidToken(): void {
+		$this->response->method('getStatusCode')->willReturn(401);
+		$this->httpClient->method('get')->willReturn($this->response);
+
+		try {
+			$this->client->getChatsRaw('https://tenant.church.tools', 'token');
+			self::fail('Expected an IntegrationException.');
+		} catch (IntegrationException $exception) {
+			self::assertSame('invalid_token', $exception->getErrorCode());
+			self::assertSame(401, $exception->getHttpStatus());
+		}
+	}
+
+	public function testForbiddenResponseMeansChurchToolsForbidden(): void {
+		$this->response->method('getStatusCode')->willReturn(403);
+		$this->httpClient->method('get')->willReturn($this->response);
+
+		try {
+			$this->client->getChatsRaw('https://tenant.church.tools', 'token');
+			self::fail('Expected an IntegrationException.');
+		} catch (IntegrationException $exception) {
+			self::assertSame('churchtools_forbidden', $exception->getErrorCode());
+			self::assertSame(403, $exception->getHttpStatus());
+		}
 	}
 }

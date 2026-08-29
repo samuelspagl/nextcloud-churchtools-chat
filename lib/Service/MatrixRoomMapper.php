@@ -420,7 +420,7 @@ final class MatrixRoomMapper {
 	 * sending an m.in_reply_to message. The remaining text is the actual reply.
 	 */
 	private function stripReplyFallback(string $body): string {
-		$lines = preg_split('/\R/', $body);
+		$lines = preg_split('/\R/u', $body);
 		if ($lines === false || $lines === []) {
 			return $body;
 		}

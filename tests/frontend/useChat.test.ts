@@ -1,3 +1,5 @@
+import { flushPromises, mount } from '@vue/test-utils'
+import { defineComponent } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -9,6 +11,9 @@ const mocks = vi.hoisted(() => ({
 	reactToMessage: vi.fn(),
 	deleteMessage: vi.fn(),
 	editMessage: vi.fn(),
+	getStatus: vi.fn(),
+	getRooms: vi.fn(),
+	syncRooms: vi.fn(),
 }))
 
 vi.mock('../../src/services/chatApi', async (importActual) => {
@@ -23,16 +28,75 @@ vi.mock('../../src/services/chatApi', async (importActual) => {
 		reactToMessage: mocks.reactToMessage,
 		deleteMessage: mocks.deleteMessage,
 		editMessage: mocks.editMessage,
+		getStatus: mocks.getStatus,
+		getRooms: mocks.getRooms,
+		syncRooms: mocks.syncRooms,
 	}
 })
 
 import { useChat } from '../../src/composables/useChat'
+
+const room = {
+	id: '!room:test',
+	name: 'Room',
+	avatarUrl: null,
+	encrypted: false,
+	kind: 'group' as const,
+	memberCount: 2,
+	unreadCount: 0,
+	lastMessage: null,
+	events: [],
+}
+
+function deferred<T>() {
+	let resolve!: (value: T) => void
+	const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise })
+	return { promise, resolve }
+}
 
 describe('useChat send/retry', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
 		mocks.getMessages.mockResolvedValue({ events: [] })
 		mocks.setFullyRead.mockResolvedValue(undefined)
+	})
+
+	it('renders the room snapshot while the background sync remains pending', async () => {
+		const firstSync = deferred<{ rooms: (typeof room)[]; nextBatch: string | null }>()
+		const secondSync = deferred<{ rooms: (typeof room)[]; nextBatch: string | null }>()
+		mocks.getStatus.mockResolvedValue({
+			configured: true,
+			tenantUrl: 'https://tenant.church.tools',
+			personId: 1,
+			personGuid: 'guid',
+			displayName: 'User',
+			canChat: true,
+			matrixConnected: true,
+			matrixUserId: '@ct_me:test',
+			capabilities: { rooms: true, messages: true, send: true, directChat: true, markdown: true, smartPicker: true },
+		})
+		mocks.getRooms.mockResolvedValue({ rooms: [room], nextBatch: 'batch-1' })
+		mocks.syncRooms.mockReturnValueOnce(firstSync.promise).mockReturnValueOnce(secondSync.promise)
+		const Host = defineComponent({
+			setup: () => useChat(),
+			template: '<div>{{ loading }}:{{ rooms.length }}</div>',
+		})
+
+		const wrapper = mount(Host)
+		await flushPromises()
+
+		expect(wrapper.text()).toBe('false:1')
+		expect(mocks.syncRooms).toHaveBeenCalledTimes(1)
+		expect(mocks.syncRooms).toHaveBeenLastCalledWith('batch-1')
+
+		firstSync.resolve({ rooms: [], nextBatch: 'batch-2' })
+		await flushPromises()
+		expect(mocks.syncRooms).toHaveBeenCalledTimes(2)
+		expect(mocks.syncRooms).toHaveBeenLastCalledWith('batch-2')
+
+		wrapper.unmount()
+		secondSync.resolve({ rooms: [], nextBatch: 'batch-3' })
+		await flushPromises()
 	})
 
 	it('reuses the same transaction id when retrying a failed message', async () => {
@@ -236,5 +300,40 @@ describe('useChat send/retry', () => {
 		await chat.editMessage(chat.rooms.value[0].events[0], '   ')
 
 		expect(mocks.editMessage).not.toHaveBeenCalled()
+	})
+
+	it('paginates older messages using the "end" token, not "start"', async () => {
+		mocks.getMessages.mockResolvedValueOnce({
+			events: [{ id: '$msg-2', sender: '@other:test', body: 'newer', timestamp: 2 }],
+			start: 'batch-a',
+			end: 'batch-b',
+		})
+		const chat = useChat()
+		chat.rooms.value = [{
+			id: '!room:test',
+			name: 'r',
+			avatarUrl: null,
+			encrypted: false,
+			kind: 'group',
+			memberCount: 1,
+			unreadCount: 0,
+			lastMessage: null,
+			events: [],
+		}]
+		await chat.selectRoom('!room:test')
+
+		expect(chat.rooms.value[0].prevBatch).toBe('batch-b')
+
+		mocks.getMessages.mockResolvedValueOnce({
+			events: [{ id: '$msg-1', sender: '@other:test', body: 'older', timestamp: 1 }],
+			start: 'batch-b',
+			end: 'batch-c',
+		})
+
+		await chat.loadOlderMessages('!room:test')
+
+		expect(mocks.getMessages).toHaveBeenLastCalledWith('!room:test', 'batch-b')
+		expect(chat.rooms.value[0].prevBatch).toBe('batch-c')
+		expect(chat.rooms.value[0].events.map((event) => event.id)).toEqual(['$msg-1', '$msg-2'])
 	})
 })

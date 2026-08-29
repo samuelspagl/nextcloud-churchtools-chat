@@ -7,9 +7,10 @@ namespace OCA\ChurchToolsChat\Service;
 use OCA\ChurchToolsChat\Exception\IntegrationException;
 
 /**
- * Diagnostic helper for the D5 spike: dump the ChurchTools chat metadata and the
- * Matrix rooms side by side so the exact CT chat -> room mapping can be confirmed
- * against a live tenant.
+ * Administrator diagnostic for the D5 spike: dump the ChurchTools chat metadata
+ * and the Matrix rooms side by side so the exact CT chat -> room mapping can be
+ * confirmed against a live tenant. ChurchTools /api/chat requires broad tenant
+ * administration permission and is never used by normal room loading.
  */
 final class ProbeService {
 	public function __construct(

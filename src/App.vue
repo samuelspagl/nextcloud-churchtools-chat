@@ -214,29 +214,30 @@ async function retryMessage(message: ChatMessage) {
 				@new-chat="openPersonSearch" />
 
 			<main class="chat-pane">
-				<div v-if="sessionExpired" class="session-expired" role="alert">
-					<span>{{ t('churchtools_chat', 'Your chat session expired. Reconnect in Personal settings to keep receiving messages.') }}</span>
-					<a :href="settingsUrl">{{ t('churchtools_chat', 'Open Personal settings') }}</a>
+				<div class="chat-pane__header">
+					<div v-if="sessionExpired" class="session-expired" role="alert">
+						<span>{{ t('churchtools_chat', 'Your chat session expired. Reconnect in Personal settings to keep receiving messages.') }}</span>
+						<a :href="settingsUrl">{{ t('churchtools_chat', 'Open Personal settings') }}</a>
+					</div>
+					<ConversationHeader
+						v-if="activeRoom"
+						:room="activeRoom"
+						:details-open="detailsOpen"
+						@back="showConversationList"
+						@toggle-details="toggleDetails" />
 				</div>
-				<ConversationHeader
-					v-if="activeRoom"
-					:room="activeRoom"
-					:details-open="detailsOpen"
-					@back="showConversationList"
-					@toggle-details="toggleDetails" />
-
-				<div v-if="connectionNotice || error" class="connection-state" role="status">
-					<h2>{{ t('churchtools_chat', 'ChurchTools Chat is not ready') }}</h2>
-					<p>{{ connectionNotice || error }}</p>
-					<a :href="settingsUrl">{{ t('churchtools_chat', 'Open Personal settings') }}</a>
-				</div>
-				<template v-else-if="activeRoom">
-					<div v-if="activeRoom.encrypted" class="connection-state" role="status">
+				<div class="chat-pane__body">
+					<div v-if="connectionNotice || error" class="connection-state" role="status">
+						<h2>{{ t('churchtools_chat', 'ChurchTools Chat is not ready') }}</h2>
+						<p>{{ connectionNotice || error }}</p>
+						<a :href="settingsUrl">{{ t('churchtools_chat', 'Open Personal settings') }}</a>
+					</div>
+					<div v-else-if="activeRoom?.encrypted" class="connection-state" role="status">
 						<h2>{{ t('churchtools_chat', 'This room is encrypted') }}</h2>
 						<p>{{ t('churchtools_chat', 'End-to-end encrypted Matrix events cannot be processed by the server-side gateway. Encrypted event content is not decrypted or displayed.') }}</p>
 					</div>
 					<MessageTimeline
-						v-else
+						v-else-if="activeRoom"
 						:messages="messages"
 						:current-user-id="status?.matrixUserId || ''"
 						:loading="loadingMessages"
@@ -253,20 +254,21 @@ async function retryMessage(message: ChatMessage) {
 						@delete="deleteMessage"
 						@edit="startEdit"
 						@jump="focusMessage" />
-					<MessageComposer
-						:disabled="!status?.capabilities.send || activeRoom.encrypted"
-						:reply-to="replyTarget"
-						:editing-message="editTarget"
-						@typing="setTyping"
-						@cancel-reply="replyTarget = null"
-						@cancel-edit="editTarget = null"
-						@send="sendMessage"
-						@edit="submitEdit" />
-				</template>
-				<div v-else-if="!loading" class="connection-state">
-					<h2>{{ t('churchtools_chat', 'Select a conversation') }}</h2>
-					<p>{{ t('churchtools_chat', 'Choose a ChurchTools room from the conversation list.') }}</p>
+					<div v-else-if="!loading" class="connection-state">
+						<h2>{{ t('churchtools_chat', 'Select a conversation') }}</h2>
+						<p>{{ t('churchtools_chat', 'Choose a ChurchTools room from the conversation list.') }}</p>
+					</div>
 				</div>
+				<MessageComposer
+					v-if="activeRoom && !(connectionNotice || error)"
+					:disabled="!status?.capabilities.send || activeRoom.encrypted"
+					:reply-to="replyTarget"
+					:editing-message="editTarget"
+					@typing="setTyping"
+					@cancel-reply="replyTarget = null"
+					@cancel-edit="editTarget = null"
+					@send="sendMessage"
+					@edit="submitEdit" />
 			</main>
 		</div>
 		<ConversationDetailsSidebar
@@ -287,16 +289,20 @@ async function retryMessage(message: ChatMessage) {
 </template>
 
 <style scoped>
-.chat-layout { display: grid; min-width: 0; min-height: 0; flex: 1; grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); overflow: hidden; }
+.chat-app { min-width: 0; min-height: 0; block-size: var(--body-height); max-block-size: var(--body-height); overflow: hidden; }
+.chat-layout { display: grid; min-width: 0; min-height: 0; block-size: 100%; flex: 1; grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); overflow: hidden; }
 .chat-layout > :first-child { border-inline-end: 1px solid var(--color-border); }
-.chat-pane { display: grid; min-width: 0; min-height: 0; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--color-main-background); }
+.chat-pane { display: grid; min-width: 0; min-height: 0; block-size: 100%; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; background: var(--color-main-background); }
+.chat-pane__header { min-width: 0; min-height: 0; }
+.chat-pane__body { display: flex; min-width: 0; min-height: 0; overflow: hidden; }
+.chat-pane__body > :first-child { min-width: 0; min-height: 0; flex: 1; }
 .connection-state { max-width: 560px; margin: auto; padding: 24px; text-align: center; }
 .session-expired { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; padding: 10px 16px; background: var(--color-error); color: var(--color-primary-element-text); font-size: 0.9em; }
 .session-expired a { color: inherit; font-weight: 600; text-decoration: underline; }
 .connection-state h2 { margin-block: 0 8px; }
 @media (max-width: 639px) {
-	.chat-layout { display: block; }
-	.chat-layout > :first-child, .chat-pane { width: 100%; height: 100%; }
+	.chat-layout { display: block; block-size: 100%; }
+	.chat-layout > :first-child, .chat-pane { width: 100%; block-size: 100%; }
 	.chat-layout:not(.chat-layout--sidebar-hidden) .chat-pane { display: none; }
 	.chat-layout--sidebar-hidden > :first-child { display: none; }
 }
