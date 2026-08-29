@@ -117,8 +117,8 @@ export function useChat() {
 				? {
 					...room,
 					events: response.events,
-					prevBatch: response.start ?? null,
-					hasMore: response.start !== null,
+					prevBatch: response.end ?? null,
+					hasMore: response.end !== null,
 					lastMessage: response.events[response.events.length - 1] ?? room.lastMessage,
 				}
 				: room)
@@ -146,7 +146,7 @@ export function useChat() {
 			const response = await getMessages(roomId, room.prevBatch)
 			const older = response.events
 			rooms.value = rooms.value.map((existing) => existing.id === roomId
-				? { ...existing, events: [...older, ...existing.events], prevBatch: response.start ?? null, hasMore: older.length > 0 && response.start !== null }
+				? { ...existing, events: [...older, ...existing.events], prevBatch: response.end ?? null, hasMore: older.length > 0 && response.end !== null }
 				: existing)
 		} catch {
 			// Keep the existing prevBatch so the user can retry loading older messages.

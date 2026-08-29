@@ -38,6 +38,34 @@ describe('ConversationSidebar', () => {
 		expect(sidebar.get('.conversation-list').element.parentElement).toBe(sidebar.element)
 	})
 
+	it('emphasizes the conversation name without emphasizing the message preview', () => {
+		const wrapper = mount(ConversationSidebar, {
+			props: {
+				rooms: [{
+					id: '!room:chat.church.tools', name: 'Project Meeting', avatarUrl: null, encrypted: false,
+					kind: 'group', memberCount: 3, unreadCount: 0,
+					lastMessage: {
+						id: '$message:chat.church.tools', sender: '@anna:chat.church.tools',
+						senderName: 'Anna', body: 'Meeting notes are ready', timestamp: 1_700_000_000_000,
+					},
+					events: [],
+				}],
+				activeRoomId: null,
+				loading: false,
+				canStartChat: true,
+				query: '',
+				searchResults: [],
+				searching: false,
+				searchError: '',
+			},
+			global: { stubs: { NcAvatar: NcAvatarStub, NcButton: NcButtonStub, NcInputField: NcInputFieldStub, NcLoadingIcon: true, NcIconSvgWrapper: true } },
+		})
+
+		expect(wrapper.get('.conversation__topline strong').text()).toBe('Project Meeting')
+		expect(wrapper.get('.conversation__preview').text()).toBe('Meeting notes are ready')
+		expect(wrapper.get('.conversation__preview').element.tagName).toBe('SPAN')
+	})
+
 	it('groups a message hit below its matching conversation and emits it on selection', async () => {
 		const message = {
 			id: '$meeting:chat.church.tools',

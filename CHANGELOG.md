@@ -15,6 +15,8 @@ All notable changes to ChurchTools Chat for Nextcloud are documented here.
   Matrix long poll.
 - Keep the conversation list, message timeline, and composer inside independent
   bounded scroll regions when chats or room lists are long.
+- Center the older-message control and keep conversation previews at normal
+  font weight while retaining emphasized conversation names.
 
 ### Changed
 

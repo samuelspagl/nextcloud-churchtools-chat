@@ -249,4 +249,39 @@ describe('useChat send/retry', () => {
 		expect(message.reactions).toEqual({ '👍': 1 })
 		expect(message.ownReactions).toEqual([])
 	})
+
+	it('paginates older messages using the "end" token, not "start"', async () => {
+		mocks.getMessages.mockResolvedValueOnce({
+			events: [{ id: '$msg-2', sender: '@other:test', body: 'newer', timestamp: 2 }],
+			start: 'batch-a',
+			end: 'batch-b',
+		})
+		const chat = useChat()
+		chat.rooms.value = [{
+			id: '!room:test',
+			name: 'r',
+			avatarUrl: null,
+			encrypted: false,
+			kind: 'group',
+			memberCount: 1,
+			unreadCount: 0,
+			lastMessage: null,
+			events: [],
+		}]
+		await chat.selectRoom('!room:test')
+
+		expect(chat.rooms.value[0].prevBatch).toBe('batch-b')
+
+		mocks.getMessages.mockResolvedValueOnce({
+			events: [{ id: '$msg-1', sender: '@other:test', body: 'older', timestamp: 1 }],
+			start: 'batch-b',
+			end: 'batch-c',
+		})
+
+		await chat.loadOlderMessages('!room:test')
+
+		expect(mocks.getMessages).toHaveBeenLastCalledWith('!room:test', 'batch-b')
+		expect(chat.rooms.value[0].prevBatch).toBe('batch-c')
+		expect(chat.rooms.value[0].events.map((event) => event.id)).toEqual(['$msg-1', '$msg-2'])
+	})
 })

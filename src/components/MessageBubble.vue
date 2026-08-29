@@ -232,7 +232,9 @@ async function saveToNextcloud() {
 .message__metadata time, .message__metadata span { color: var(--color-text-maxcontrast); font-size: 12px; }
 .message__bubble-line { position: relative; display: flex; min-width: 0; align-items: center; gap: 4px; }
 .message--own .message__bubble-line { flex-direction: row-reverse; }
-.message__bubble { padding: 8px 12px; border-radius: 4px 16px 16px 16px; background: var(--color-background-dark); overflow-wrap: anywhere; }
+.message__bubble { min-width: 0; padding: 8px 12px; border-radius: 4px 16px 16px 16px; background: var(--color-background-dark); overflow-wrap: anywhere; }
+.message__bubble :deep(pre) { max-width: 100%; overflow-x: auto; }
+.message__bubble :deep(table) { display: block; max-width: 100%; overflow-x: auto; }
 .message--own .message__bubble { border-radius: 16px 4px 16px 16px; color: var(--color-primary-element-text); background: var(--color-primary-element); }
 .message__bubble--attachment { padding: 0; overflow: visible; background: transparent; }
 .message--own .message__bubble--attachment { background: transparent; }
