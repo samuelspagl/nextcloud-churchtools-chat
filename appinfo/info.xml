@@ -34,6 +34,10 @@ ChurchTools Chat brings [ChurchTools](https://church.tools) chat into Nextcloud 
     <website>https://github.com/samuelspagl/nextcloud-churchtools-chat</website>
     <bugs>https://github.com/samuelspagl/nextcloud-churchtools-chat/issues</bugs>
     <repository type="git">https://github.com/samuelspagl/nextcloud-churchtools-chat.git</repository>
+    <screenshot small-thumbnail="https://raw.githubusercontent.com/samuelspagl/nextcloud-churchtools-chat/main/docs/screenshots/conversations.png">https://raw.githubusercontent.com/samuelspagl/nextcloud-churchtools-chat/main/docs/screenshots/conversations.png</screenshot>
+    <screenshot small-thumbnail="https://raw.githubusercontent.com/samuelspagl/nextcloud-churchtools-chat/main/docs/screenshots/chat.png">https://raw.githubusercontent.com/samuelspagl/nextcloud-churchtools-chat/main/docs/screenshots/chat.png</screenshot>
+    <screenshot small-thumbnail="https://raw.githubusercontent.com/samuelspagl/nextcloud-churchtools-chat/main/docs/screenshots/room-info.png">https://raw.githubusercontent.com/samuelspagl/nextcloud-churchtools-chat/main/docs/screenshots/room-info.png</screenshot>
+    <screenshot small-thumbnail="https://raw.githubusercontent.com/samuelspagl/nextcloud-churchtools-chat/main/docs/screenshots/group-info.png">https://raw.githubusercontent.com/samuelspagl/nextcloud-churchtools-chat/main/docs/screenshots/group-info.png</screenshot>
     <documentation>
         <user>https://github.com/samuelspagl/nextcloud-churchtools-chat#readme</user>
         <admin>https://github.com/samuelspagl/nextcloud-churchtools-chat#readme</admin>

@@ -41,8 +41,46 @@ receipts.
 - ⌨️ **Typing indicators & read receipts** — see when others are typing and whether direct messages have been read
 - 🔐 **Per-user credentials** — every user connects their own ChurchTools account; no shared or admin-level credentials are required
 
+## 📸 Screenshots
+
+<table>
+<tr>
+<td width="50%">
+
+<img src="docs/screenshots/conversations.png" alt="Conversation list">
+
+*Conversation list*
+
+</td>
+<td width="50%">
+
+<img src="docs/screenshots/chat.png" alt="Chat view">
+
+*Chat view*
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+<img src="docs/screenshots/room-info.png" alt="Room details panel">
+
+*Room details panel*
+
+</td>
+<td width="50%">
+
+<img src="docs/screenshots/group-info.png" alt="Group information modal">
+
+*Group information modal, with leaders, matching Nextcloud Teams and Deck boards*
+
+</td>
+</tr>
+</table>
+
 ## Table of contents
 
+- [Screenshots](#-screenshots)
 - [Current integration boundary](#current-integration-boundary)
 - [Starting a direct chat](#starting-a-direct-chat)
 - [Development](#development)
