@@ -2,6 +2,15 @@
 
 All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
+## [0.7.2]
+
+### Fixed
+
+- App icon now uses a white fill (matching Nextcloud core apps' convention)
+  instead of `currentColor`, which rendered solid black in the app menu
+  because the icon is displayed via `<img>`, an isolated context where
+  `currentColor` cannot inherit the page's text color.
+
 ## [0.7.1]
 
 ### Changed
