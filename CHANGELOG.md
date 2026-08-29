@@ -2,6 +2,21 @@
 
 All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
+## [0.7.0]
+
+### Added
+
+- Group context in the chat inspector: a uniquely named visible ChurchTools
+  group can be opened in a dialog with visibility, type, category,
+  description, leadership roles, and a direct ChurchTools link.
+- Matching Nextcloud Teams and their user-visible linked folders and Deck
+  boards are shown alongside the ChurchTools group.
+
+### Changed
+
+- Raise the minimum supported Nextcloud version to 33 so team membership and
+  team resources can be resolved through the public Teams API.
+
 ## [0.6.7]
 
 ### Added

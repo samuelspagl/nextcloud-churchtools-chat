@@ -8,6 +8,9 @@ A chat-only Nextcloud app with a Talk-like Vue 3 interface, Markdown rendering,
 Nextcloud Smart Picker support, and per-user ChurchTools credentials.
 It can search visible ChurchTools people by name and start or reopen a Matrix
 direct conversation for the selected person.
+For group conversations, the chat inspector can resolve a uniquely named,
+visible ChurchTools group and show its group details together with matching
+Nextcloud Teams, linked folders, and Deck boards.
 
 ## Current integration boundary
 
@@ -28,6 +31,12 @@ Matrix canonical aliases can identify a ChurchTools chat type and chat-specific
 GUID, but they do not contain the numeric ChurchTools group or event ID. Future
 group or event linking must use APIs available under the connected user's own
 permissions and must not make `/api/chat` a runtime dependency.
+
+The group inspector follows that boundary: it searches visible ChurchTools
+groups by the Matrix room display name, accepts only one normalized exact
+match, and uses the connected user's permissions for all group and member
+details. Matching Nextcloud Teams and resources are likewise limited to the
+current Nextcloud user's access.
 
 ## Starting a direct chat
 

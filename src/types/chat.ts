@@ -88,6 +88,56 @@ export interface RoomDetails {
 	members: readonly RoomMember[]
 }
 
+export type GroupContextMatchStatus = 'matched' | 'none' | 'ambiguous' | 'not_applicable'
+export type NextcloudGroupContextStatus = 'matched' | 'none' | 'unavailable' | 'error'
+
+export interface GroupLeader {
+	personId: number
+	displayName: string
+	avatarUrl: string | null
+}
+
+export interface GroupLeadershipRole {
+	roleId: number
+	roleName: string
+	members: readonly GroupLeader[]
+}
+
+export interface ChurchToolsGroupContext {
+	id: number
+	name: string
+	visibility: 'public' | 'internal' | 'restricted' | 'hidden' | 'unknown' | null
+	groupType: string | null
+	category: string | null
+	description: string | null
+	frontendUrl: string | null
+	leadership: readonly GroupLeadershipRole[]
+	memberCount: number
+}
+
+export interface TeamResourceContext {
+	id: string
+	kind: 'folder' | 'deck-board'
+	label: string
+	url: string
+}
+
+export interface TeamContext {
+	id: string
+	name: string
+	url: string | null
+	resources: readonly TeamResourceContext[]
+}
+
+export interface GroupContextResponse {
+	matchStatus: GroupContextMatchStatus
+	group: ChurchToolsGroupContext | null
+	nextcloud: {
+		status: NextcloudGroupContextStatus
+		teams: readonly TeamContext[]
+	}
+}
+
 export interface RoomsResponse {
 	rooms: ChatRoom[]
 	nextBatch: string | null

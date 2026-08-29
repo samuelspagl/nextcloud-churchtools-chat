@@ -149,6 +149,117 @@ final class ChurchToolsClient {
 		];
 	}
 
+	/** @return list<array{id:int,name:string,frontendUrl:string|null}> */
+	public function searchGroups(string $tenantUrl, string $token, string $query): array {
+		$query = trim($query);
+		if ($query === '' || mb_strlen($query) > 200) {
+			throw new IntegrationException('invalid_group_query', 'The group name is invalid.', 400);
+		}
+
+		$payload = $this->request($tenantUrl, $token, '/api/search?' . http_build_query([
+			'query' => $query,
+			'domain_types' => ['group'],
+		]));
+		$data = $payload['data'] ?? [];
+		if (!is_array($data)) {
+			throw new IntegrationException('invalid_group_search_response', 'ChurchTools returned an invalid group search response.', 502);
+		}
+
+		$groups = [];
+		foreach ($data as $item) {
+			if (!is_array($item) || ($item['domainType'] ?? '') !== 'group') {
+				continue;
+			}
+			$attributes = is_array($item['domainAttributes'] ?? null) ? $item['domainAttributes'] : [];
+			$idValue = (string)($item['domainIdentifier'] ?? '');
+			if (!ctype_digit($idValue)
+				&& preg_match('~/(?:api/)?groups/([0-9]+)(?:$|[/?])~', (string)($item['apiUrl'] ?? ''), $matches)) {
+				$idValue = $matches[1];
+			}
+			$name = trim((string)($attributes['name'] ?? $item['title'] ?? ''));
+			if (!ctype_digit($idValue) || (int)$idValue <= 0 || $name === '') {
+				continue;
+			}
+			$frontendUrl = $item['frontendUrl'] ?? null;
+			$groups[] = [
+				'id' => (int)$idValue,
+				'name' => $name,
+				'frontendUrl' => is_string($frontendUrl) && $frontendUrl !== '' ? $frontendUrl : null,
+			];
+		}
+
+		return $groups;
+	}
+
+	/** @return array<string,mixed> */
+	public function getGroup(string $tenantUrl, string $token, int $groupId): array {
+		if ($groupId <= 0) {
+			throw new IntegrationException('invalid_group', 'The selected ChurchTools group is invalid.', 400);
+		}
+		$payload = $this->request($tenantUrl, $token, '/api/groups/' . $groupId . '?' . http_build_query([
+			'include' => ['roles'],
+		]));
+		$data = $payload['data'] ?? [];
+		$group = is_array($data) ? $data : null;
+		if (!is_array($group) || (int)($group['id'] ?? 0) !== $groupId) {
+			throw new IntegrationException('group_not_found', 'The selected ChurchTools group is unavailable.', 404);
+		}
+		return $group;
+	}
+
+	/** @return list<array<string,mixed>> */
+	public function getGroupMembers(string $tenantUrl, string $token, int $groupId): array {
+		if ($groupId <= 0) {
+			throw new IntegrationException('invalid_group', 'The selected ChurchTools group is invalid.', 400);
+		}
+		$members = [];
+		$page = 1;
+		do {
+			$payload = $this->request($tenantUrl, $token, '/api/groups/' . $groupId . '/members?' . http_build_query([
+				'limit' => 100,
+				'page' => $page,
+			]));
+			$data = $payload['data'] ?? [];
+			if (!is_array($data)) {
+				throw new IntegrationException('invalid_group_members_response', 'ChurchTools returned invalid group members.', 502);
+			}
+			array_push($members, ...array_values(array_filter($data, 'is_array')));
+			$pagination = is_array($payload['meta']['pagination'] ?? null) ? $payload['meta']['pagination'] : [];
+			$lastPage = max(1, (int)($pagination['lastPage'] ?? 1));
+			$page++;
+		} while ($page <= $lastPage);
+
+		return $members;
+	}
+
+	/** @return list<array<string,mixed>> */
+	public function getGroupTypes(string $tenantUrl, string $token): array {
+		return $this->getList($tenantUrl, $token, '/api/group/grouptypes', 'invalid_group_types_response');
+	}
+
+	/** @return array<string,mixed> */
+	public function getGroupCategory(string $tenantUrl, string $token, int $categoryId): array {
+		if ($categoryId <= 0) {
+			throw new IntegrationException('invalid_group_category', 'The selected ChurchTools group category is invalid.', 400);
+		}
+		$payload = $this->request($tenantUrl, $token, '/api/group/groupcategories/' . $categoryId);
+		$data = $payload['data'] ?? null;
+		if (!is_array($data) || (int)($data['id'] ?? 0) !== $categoryId) {
+			throw new IntegrationException('invalid_group_category_response', 'ChurchTools returned invalid group category data.', 502);
+		}
+		return $data;
+	}
+
+	/** @return list<array<string,mixed>> */
+	private function getList(string $tenantUrl, string $token, string $path, string $errorCode): array {
+		$payload = $this->request($tenantUrl, $token, $path);
+		$data = $payload['data'] ?? [];
+		if (!is_array($data)) {
+			throw new IntegrationException($errorCode, 'ChurchTools returned invalid group master data.', 502);
+		}
+		return array_values(array_filter($data, 'is_array'));
+	}
+
 	/** @return array<string,mixed> */
 	private function request(string $tenantUrl, string $token, string $path): array {
 		if ($token === '') {

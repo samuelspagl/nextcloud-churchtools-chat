@@ -6,6 +6,7 @@ import type {
 	ChatStatus,
 	ConversationSearchResponse,
 	DirectChatResponse,
+	GroupContextResponse,
 	MessageSearchResponse,
 	MessagesResponse,
 	PersonSearchResponse,
@@ -75,6 +76,13 @@ export async function searchRoomMessages(roomId: string, query: string): Promise
 export async function getRoomDetails(roomId: string): Promise<RoomDetails> {
 	const response = await axios.get<ApiEnvelope<RoomDetails>>(
 		endpoint(`/api/rooms/${encodeURIComponent(roomId)}/details`),
+	)
+	return response.data.data
+}
+
+export async function getGroupContext(roomId: string): Promise<GroupContextResponse> {
+	const response = await axios.get<ApiEnvelope<GroupContextResponse>>(
+		endpoint(`/api/rooms/${encodeURIComponent(roomId)}/group-context`),
 	)
 	return response.data.data
 }
