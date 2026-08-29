@@ -2,6 +2,18 @@
 
 All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
+## [0.7.4]
+
+### Fixed
+
+- Personal and admin settings sections now use a dedicated `app-dark.svg`
+  icon (black fill) instead of reusing the white `app.svg` meant for the
+  app menu. Nextcloud expects two separate icon files per app — a light
+  one for colored/dark backgrounds (the top app menu) and a dark one for
+  light backgrounds (settings sidebar, apps list), matching the
+  `app.svg`/`app-dark.svg` convention used by Nextcloud core apps
+  (e.g. `theming`, `user_ldap`, `files_external`).
+
 ## [0.7.2]
 
 ### Fixed
