@@ -13,7 +13,7 @@ vi.mock('@nextcloud/router', () => ({
 	generateUrl: (path: string) => path,
 }))
 
-import { getErrorCode, getErrorMessage, getErrorValue, getRoomDetails, searchConversations, searchPersons, searchRoomMessages, sendAttachment, startDirectChat } from '../../src/services/chatApi'
+import { getErrorCode, getErrorMessage, getErrorValue, getGroupContext, getRoomDetails, searchConversations, searchPersons, searchRoomMessages, sendAttachment, startDirectChat } from '../../src/services/chatApi'
 
 const mockedAxios = vi.mocked(axios)
 
@@ -61,6 +61,16 @@ describe('direct chat API', () => {
 
 		expect(mockedAxios.get).toHaveBeenCalledWith(
 			'/apps/churchtools_chat/api/rooms/!room%3Achat.church.tools/details',
+		)
+	})
+
+	it('loads group context from the encoded room endpoint', async () => {
+		mockedAxios.get.mockResolvedValue({ data: { data: { matchStatus: 'none', group: null, nextcloud: { status: 'unavailable', teams: [] } } } })
+
+		await getGroupContext('!room:chat.church.tools')
+
+		expect(mockedAxios.get).toHaveBeenCalledWith(
+			'/apps/churchtools_chat/api/rooms/!room%3Achat.church.tools/group-context',
 		)
 	})
 

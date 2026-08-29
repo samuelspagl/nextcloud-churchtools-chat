@@ -90,4 +90,63 @@ final class ChurchToolsClientTest extends TestCase {
 			self::assertSame(403, $exception->getHttpStatus());
 		}
 	}
+
+	public function testSearchGroupsNormalizesSearchResultsAndKeepsFrontendLink(): void {
+		$this->response->method('getStatusCode')->willReturn(200);
+		$this->response->method('getBody')->willReturn(json_encode([
+			'data' => [
+				[
+					'domainType' => 'group',
+					'domainIdentifier' => '17',
+					'title' => 'Technik',
+					'frontendUrl' => 'https://tenant.church.tools/?q=groups#/17',
+				],
+				['domainType' => 'person', 'domainIdentifier' => '18', 'title' => 'Technik'],
+			],
+		], JSON_THROW_ON_ERROR));
+		$this->httpClient->expects(self::once())->method('get')->with(
+			self::stringStartsWith('https://tenant.church.tools/api/search?'),
+			self::anything(),
+		)->willReturn($this->response);
+
+		$groups = $this->client->searchGroups('https://tenant.church.tools', 'token', 'Technik');
+
+		self::assertSame([[
+			'id' => 17,
+			'name' => 'Technik',
+			'frontendUrl' => 'https://tenant.church.tools/?q=groups#/17',
+		]], $groups);
+	}
+
+	public function testGetGroupUsesDetailEndpointWithRoles(): void {
+		$this->response->method('getStatusCode')->willReturn(200);
+		$this->response->method('getBody')->willReturn(json_encode([
+			'data' => ['id' => 17, 'name' => 'Technik'],
+		], JSON_THROW_ON_ERROR));
+		$this->httpClient->expects(self::once())->method('get')->with(
+			self::stringStartsWith('https://tenant.church.tools/api/groups/17?'),
+			self::anything(),
+		)->willReturn($this->response);
+
+		self::assertSame('Technik', $this->client->getGroup('https://tenant.church.tools', 'token', 17)['name']);
+	}
+
+	public function testGetGroupMembersUsesSupportedPageSizeAndLoadsAllPages(): void {
+		$this->httpClient->expects(self::exactly(2))->method('get')->willReturnCallback(function (string $url): IResponse {
+			$response = $this->createMock(IResponse::class);
+			$response->method('getStatusCode')->willReturn(200);
+			parse_str((string)parse_url($url, PHP_URL_QUERY), $query);
+			self::assertSame('100', (string)($query['limit'] ?? ''));
+			$page = (int)($query['page'] ?? 0);
+			$response->method('getBody')->willReturn(json_encode([
+				'data' => [['personId' => $page]],
+				'meta' => ['pagination' => ['lastPage' => 2]],
+			], JSON_THROW_ON_ERROR));
+			return $response;
+		});
+
+		$members = $this->client->getGroupMembers('https://tenant.church.tools', 'token', 17);
+
+		self::assertSame([1, 2], array_column($members, 'personId'));
+	}
 }

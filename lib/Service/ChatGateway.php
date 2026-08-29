@@ -7,7 +7,7 @@ namespace OCA\ChurchToolsChat\Service;
 use OCA\ChurchToolsChat\Exception\IntegrationException;
 use Psr\Log\LoggerInterface;
 
-final class ChatGateway {
+final class ChatGateway implements RoomDetailsProvider {
 	public function __construct(
 		private readonly SecretService $secrets,
 		private readonly ChurchToolsClient $churchTools,

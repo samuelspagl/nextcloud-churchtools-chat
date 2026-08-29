@@ -22,6 +22,12 @@ Endpoints used by normal user-facing requests:
   ChurchTools people by name. Queries contain between 2 and 100 characters.
 - `GET /api/persons?ids[]=<personId>&limit=1` resolves a selected search result
   again on the server and supplies the authoritative GUID and chat flags.
+- `GET /api/search?query=<name>&domain_types[]=group` finds visible group
+  candidates for the chat inspector. The app accepts only one normalized exact
+  name match and never uses the room name as a ChurchTools identifier.
+- `GET /api/groups?ids[]=<groupId>&limit=1`, the group's members endpoint, and
+  the group type/category master-data endpoints provide the inspector details
+  under the connected user's own permissions.
 
 The ChurchTools `canChat` flag is treated as advisory because it may be false
 for accounts that can still authenticate with the Matrix homeserver. The app
@@ -101,7 +107,7 @@ Other observations: a `creator` of `-4` marks chats created by the ChurchTools
 system. A room alias can be resolved without joining when its chat metadata is
 available to an authorized administrator.
 
-### Future group and event linking
+### Group inspector matching and future event linking
 
 The canonical Matrix alias exposes the chat prefix and chat-specific GUID. The
 prefix can classify known chat types (`ctg` for groups and `cte` for events), but
@@ -109,11 +115,26 @@ the alias does not contain the numeric ChurchTools `domainId`. Matrix room IDs
 are opaque, and room names are not unique, so neither may be used to infer a
 ChurchTools group or event ID.
 
-Any future feature that links a room to a ChurchTools group or event must use a
+The group inspector searches visible groups through `/api/search`, normalizes
+Unicode case and whitespace, and proceeds only when exactly one result has the
+same name as the Matrix room. Zero results remain unlinked and duplicate names
+are reported as ambiguous. This is deliberately a display-only convenience,
+not a persistent identity mapping. It does not reintroduce `/api/chat` as a
+normal runtime dependency.
+
+Any future event linking or persistent group mapping must likewise use a
 documented endpoint available under the connected user's own permissions and
-must handle invisible entities explicitly. It must not reintroduce `/api/chat`
-as a normal runtime dependency. The endpoint may only remain optional
+handle invisible entities explicitly. `/api/chat` may only remain optional
 administrator enrichment or diagnosis.
+
+## Nextcloud Teams resources
+
+Nextcloud 33 is the minimum supported release. The inspector uses the public
+`OCP\Teams\ITeamManager` API to list teams for the current user, accepts exact
+normalized display-name matches, and calls `getSharedWith()` for each match.
+Only resources registered by Files or Deck providers are returned; other team
+resource types and indirect relationships are ignored. Missing Deck support is
+an empty resource list rather than a hard application dependency.
 
 The published OpenAPI does **not** expose message events or a Matrix
 token-exchange/bootstrap endpoint. Those capabilities must not be invented from

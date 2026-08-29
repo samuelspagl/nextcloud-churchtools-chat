@@ -6,6 +6,7 @@ namespace OCA\ChurchToolsChat\Controller;
 
 use OCA\ChurchToolsChat\Exception\IntegrationException;
 use OCA\ChurchToolsChat\Service\ChatGateway;
+use OCA\ChurchToolsChat\Service\GroupContextService;
 use OCA\ChurchToolsChat\Service\UserContext;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\JSONResponse;
@@ -18,6 +19,7 @@ final class ChatController extends ApiController {
 		LoggerInterface $logger,
 		private readonly UserContext $userContext,
 		private readonly ChatGateway $gateway,
+		private readonly GroupContextService $groupContext,
 	) {
 		parent::__construct($request, $logger);
 	}
@@ -67,6 +69,11 @@ final class ChatController extends ApiController {
 	#[NoAdminRequired]
 	public function details(string $roomId): JSONResponse {
 		return $this->respond(fn (): array => $this->gateway->getRoomDetails($this->userContext->getUserId(), $roomId));
+	}
+
+	#[NoAdminRequired]
+	public function groupContext(string $roomId): JSONResponse {
+		return $this->respond(fn (): array => $this->groupContext->getForRoom($this->userContext->getUserId(), $roomId));
 	}
 
 	/** @param list<string>|null $mentions */

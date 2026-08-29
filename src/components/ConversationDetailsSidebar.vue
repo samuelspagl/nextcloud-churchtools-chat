@@ -3,13 +3,16 @@ import { translate as t } from '@nextcloud/l10n'
 import NcAppSidebar from '@nextcloud/vue/components/NcAppSidebar'
 import NcAppSidebarTab from '@nextcloud/vue/components/NcAppSidebarTab'
 import NcAvatar from '@nextcloud/vue/components/NcAvatar'
+import NcButton from '@nextcloud/vue/components/NcButton'
 import NcInputField from '@nextcloud/vue/components/NcInputField'
 import NcListItem from '@nextcloud/vue/components/NcListItem'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import NcNoteCard from '@nextcloud/vue/components/NcNoteCard'
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
 import type { ChatMessage, ChatRoom, RoomDetails } from '../types/chat'
 import { displayableAvatarUrl } from '../utils/avatar'
+import { useGroupContext } from '../composables/useGroupContext'
+import GroupContextDialog from './GroupContextDialog.vue'
 
 const props = defineProps<{
 	open: boolean
@@ -56,6 +59,22 @@ const accessDetails = computed(() => [
 
 const hasTechnicalDetails = computed(() => resolved.value.creator !== null || resolved.value.roomId !== '' || accessDetails.value.length > 0)
 const hasSearchTerm = computed(() => props.searchQuery.trim().length >= 2)
+const groupContextEnabled = computed(() => props.open && resolved.value.kind === 'group')
+const groupContextDialogOpen = shallowRef(false)
+const {
+	context: groupContext,
+	loading: loadingGroupContext,
+	error: groupContextError,
+	retry: retryGroupContext,
+} = useGroupContext({
+	roomId: computed(() => resolved.value.roomId),
+	enabled: groupContextEnabled,
+})
+
+function retryContext() {
+	groupContextDialogOpen.value = false
+	retryGroupContext()
+}
 
 function updateSearchQuery(query: string | number) {
 	emit('update:searchQuery', String(query))
@@ -77,6 +96,12 @@ function closeOnEscape(event: KeyboardEvent) {
 
 onMounted(() => window.addEventListener('keydown', closeOnEscape))
 onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
+watch(() => resolved.value.roomId, () => {
+	groupContextDialogOpen.value = false
+})
+watch(groupContextEnabled, (enabled) => {
+	if (!enabled) groupContextDialogOpen.value = false
+})
 </script>
 
 <template>
@@ -101,6 +126,28 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
 					<h2>{{ resolved.name }}</h2>
 				</div>
 				<p v-if="resolved.topic" class="details-hero__topic">{{ resolved.topic }}</p>
+			</div>
+
+			<div v-if="resolved.kind === 'group'" class="group-context-action">
+				<div v-if="loadingGroupContext" class="group-context-action__loading">
+					<NcLoadingIcon :size="20" />
+					<span>{{ t('churchtools_chat', 'Looking for group information…') }}</span>
+				</div>
+				<NcButton
+					v-else-if="groupContext?.matchStatus === 'matched'"
+					variant="secondary"
+					wide
+					@click="groupContextDialogOpen = true">
+					{{ t('churchtools_chat', 'Group information') }}
+				</NcButton>
+				<NcNoteCard
+					v-else-if="groupContext?.matchStatus === 'ambiguous'"
+					type="warning"
+					:text="t('churchtools_chat', 'Several ChurchTools groups have this name. Group information cannot be assigned unambiguously.')" />
+				<div v-else-if="groupContextError" class="group-context-action__error">
+					<NcNoteCard type="error" :text="groupContextError" />
+					<NcButton variant="tertiary" @click="retryContext">{{ t('churchtools_chat', 'Retry') }}</NcButton>
+				</div>
 			</div>
 
 			<div class="details-search">
@@ -177,6 +224,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
 			</template>
 		</NcAppSidebarTab>
 	</NcAppSidebar>
+	<GroupContextDialog
+		v-if="groupContextDialogOpen && groupContext"
+		:context="groupContext"
+		@close="groupContextDialogOpen = false"
+		@retry="retryContext" />
 </template>
 
 <style scoped>
@@ -187,6 +239,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
 .details-hero__topic { color: var(--color-text-maxcontrast); font-size: 13px; }
 .details-hero__topic { max-inline-size: 100%; margin: 2px 0 0; white-space: pre-wrap; }
 .details-search { padding: 0 12px 10px; }
+.group-context-action { padding: 0 12px 10px; }
+.group-context-action__loading { display: flex; align-items: center; justify-content: center; gap: 7px; min-block-size: 34px; color: var(--color-text-maxcontrast); font-size: 13px; }
+.group-context-action__error { display: grid; gap: 5px; }
 .details-search__hint { margin: 5px 0 0; color: var(--color-text-maxcontrast); font-size: 12px; }
 .details-search__state { display: flex; align-items: center; gap: 7px; padding: 8px 0; color: var(--color-text-maxcontrast); font-size: 13px; }
 .details-state { display: flex; min-height: 140px; align-items: center; justify-content: center; gap: 8px; color: var(--color-text-maxcontrast); }

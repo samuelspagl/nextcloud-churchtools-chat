@@ -21,6 +21,7 @@ return [
 		['name' => 'chat#searchPersons', 'url' => '/api/persons', 'verb' => 'GET'],
 		['name' => 'chat#startDirect', 'url' => '/api/direct-chats', 'verb' => 'POST'],
 		['name' => 'chat#details', 'url' => '/api/rooms/{roomId}/details', 'verb' => 'GET'],
+		['name' => 'chat#groupContext', 'url' => '/api/rooms/{roomId}/group-context', 'verb' => 'GET'],
 		['name' => 'chat#searchMessages', 'url' => '/api/rooms/{roomId}/search', 'verb' => 'GET'],
 		['name' => 'chat#messages', 'url' => '/api/rooms/{roomId}/messages', 'verb' => 'GET'],
 		['name' => 'chat#message', 'url' => '/api/rooms/{roomId}/messages/{eventId}', 'verb' => 'GET'],

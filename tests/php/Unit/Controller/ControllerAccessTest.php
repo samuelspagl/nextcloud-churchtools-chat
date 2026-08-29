@@ -29,6 +29,7 @@ final class ControllerAccessTest extends TestCase {
 				'searchMessages',
 				'searchConversations',
 				'details',
+				'groupContext',
 				'send',
 				'react',
 				'edit',
