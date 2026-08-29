@@ -53,6 +53,7 @@ const {
 	react,
 	unreact,
 	deleteMessage,
+	editMessage,
 	loadOlderMessages,
 	toggleDetails,
 	closeDetails,
@@ -64,6 +65,7 @@ const messageSearchQuery = shallowRef('')
 const personSearchOpen = shallowRef(false)
 const sidebarOpen = shallowRef(true)
 const replyTarget = shallowRef<ChatMessage | null>(null)
+const editTarget = shallowRef<ChatMessage | null>(null)
 const settingsUrl = generateUrl('/settings/user/additional')
 const connectionNotice = computed(() => {
 	if (!status.value) return ''
@@ -134,13 +136,28 @@ async function choosePerson(person: PersonSearchResult) {
 	}
 }
 
-async function sendMessage(body: string) {
+async function sendMessage(body: string, mentions: string[]) {
 	try {
-		await send(body, { replyTo: replyTarget.value ?? undefined })
+		await send(body, { replyTo: replyTarget.value ?? undefined, mentions })
 		replyTarget.value = null
 	} catch {
 		// The optimistic message exposes retry in the timeline.
 	}
+}
+
+function startReply(message: ChatMessage) {
+	editTarget.value = null
+	replyTarget.value = message
+}
+
+function startEdit(message: ChatMessage) {
+	replyTarget.value = null
+	editTarget.value = message
+}
+
+async function submitEdit(message: ChatMessage, body: string) {
+	await editMessage(message, body)
+	editTarget.value = null
 }
 
 async function reactToMessage(message: ChatMessage, emoji: string) {
@@ -231,10 +248,11 @@ async function retryMessage(message: ChatMessage) {
 						:read-receipts="activeRoom?.kind === 'direct' ? activeRoom?.readReceipts : undefined"
 						@load-older="loadOlderMessages(activeRoomId ?? '')"
 						@retry="retryMessage"
-						@reply="replyTarget = $event"
+						@reply="startReply"
 						@react="reactToMessage"
 						@unreact="unreactToMessage"
 						@delete="deleteMessage"
+						@edit="startEdit"
 						@jump="focusMessage" />
 					<div v-else-if="!loading" class="connection-state">
 						<h2>{{ t('churchtools_chat', 'Select a conversation') }}</h2>
@@ -245,9 +263,12 @@ async function retryMessage(message: ChatMessage) {
 					v-if="activeRoom && !(connectionNotice || error)"
 					:disabled="!status?.capabilities.send || activeRoom.encrypted"
 					:reply-to="replyTarget"
+					:editing-message="editTarget"
 					@typing="setTyping"
 					@cancel-reply="replyTarget = null"
-					@send="sendMessage" />
+					@cancel-edit="editTarget = null"
+					@send="sendMessage"
+					@edit="submitEdit" />
 			</main>
 		</div>
 		<ConversationDetailsSidebar

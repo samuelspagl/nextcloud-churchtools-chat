@@ -11,6 +11,7 @@ import {
 	getStatus,
 	reactToMessage,
 	deleteMessage as deleteMessageRequest,
+	editMessage as editMessageRequest,
 	searchConversations as searchConversationsRequest,
 	searchPersons as searchPersonsRequest,
 	searchRoomMessages as searchRoomMessagesRequest,
@@ -153,7 +154,7 @@ export function useChat() {
 		}
 	}
 
-	async function send(body: string, options?: { replyTo?: ChatMessage; transactionId?: string }) {
+	async function send(body: string, options?: { replyTo?: ChatMessage; transactionId?: string; mentions?: string[] }) {
 		const roomId = activeRoomId.value
 		const replyTo = options?.replyTo
 		if (!roomId || body.trim() === '') return
@@ -172,7 +173,7 @@ export function useChat() {
 			? { ...room, events: [...room.events, optimistic], lastMessage: optimistic }
 			: room)
 		try {
-			const sent = await sendMessage(roomId, optimistic.body, txn, replyTo?.id)
+			const sent = await sendMessage(roomId, optimistic.body, txn, replyTo?.id, options?.mentions)
 			rooms.value = rooms.value.map((room) => room.id === roomId
 				? { ...room, events: room.events.map((message) => message.id === txn ? { ...message, id: sent.eventId, status: 'sent' } : message) }
 				: room)
@@ -235,6 +236,25 @@ export function useChat() {
 					...room,
 					events: room.events.map((event) => event.id === message.id
 						? { ...event, redacted: true, body: '', attachment: undefined, reactions: undefined }
+						: event),
+				}
+				: room)
+		} catch (error) {
+			showError(getErrorMessage(error))
+		}
+	}
+
+	async function editMessage(message: ChatMessage, body: string) {
+		const roomId = activeRoomId.value
+		const trimmed = body.trim()
+		if (!roomId || message.id.startsWith('nc-') || trimmed === '') return
+		try {
+			await editMessageRequest(roomId, message.id, trimmed, transactionId())
+			rooms.value = rooms.value.map((room) => room.id === roomId
+				? {
+					...room,
+					events: room.events.map((event) => event.id === message.id
+						? { ...event, body: trimmed, edited: true }
 						: event),
 				}
 				: room)
@@ -591,6 +611,7 @@ export function useChat() {
 		react,
 		unreact,
 		deleteMessage,
+		editMessage,
 		toggleDetails,
 		closeDetails,
 		loadRoomDetails,

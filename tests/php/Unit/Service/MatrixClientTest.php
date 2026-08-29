@@ -341,6 +341,44 @@ final class MatrixClientTest extends TestCase {
 		self::assertSame('$edited:chat.church.tools', $result['event_id']);
 	}
 
+	public function testSendMessageIncludesMentionsUserIds(): void {
+		$this->response->method('getStatusCode')->willReturn(200);
+		$this->response->method('getBody')->willReturn(json_encode(['event_id' => '$msg:chat.church.tools']));
+		$this->httpClient
+			->expects(self::once())
+			->method('put')
+			->with(
+				self::anything(),
+				self::callback(static function (array $options): bool {
+					$body = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
+					self::assertSame(['@anna:chat.church.tools'], $body['m.mentions']['user_ids']);
+					return true;
+				}),
+			)
+			->willReturn($this->response);
+
+		$this->matrix->sendMessage('secret-token', '!room:chat.church.tools', 'hi @anna', 'nc-txn', null, ['@anna:chat.church.tools']);
+	}
+
+	public function testSendMessageOmitsMentionsWhenNoneGiven(): void {
+		$this->response->method('getStatusCode')->willReturn(200);
+		$this->response->method('getBody')->willReturn(json_encode(['event_id' => '$msg:chat.church.tools']));
+		$this->httpClient
+			->expects(self::once())
+			->method('put')
+			->with(
+				self::anything(),
+				self::callback(static function (array $options): bool {
+					$body = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
+					self::assertArrayNotHasKey('m.mentions', $body);
+					return true;
+				}),
+			)
+			->willReturn($this->response);
+
+		$this->matrix->sendMessage('secret-token', '!room:chat.church.tools', 'hi', 'nc-txn');
+	}
+
 	public function testSendsTypingIndicatorWithTimeout(): void {
 		$this->response->method('getStatusCode')->willReturn(200);
 		$this->response->method('getBody')->willReturn('{}');

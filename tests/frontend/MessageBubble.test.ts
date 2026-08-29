@@ -292,6 +292,54 @@ describe('MessageBubble', () => {
 		expect(wrapper.find('.message__read').exists()).toBe(true)
 	})
 
+	it('emits edit for an own sent text message and hides the action for attachments', async () => {
+		const wrapper = shallowMount(MessageBubble, {
+			props: {
+				currentUserId: '@me:example.test',
+				message: { id: '$m', sender: '@me:example.test', body: 'hi', timestamp: 1, status: 'sent' },
+			},
+			global: {
+				stubs: {
+					MessageReferencePreview: MessageReferencePreviewStub,
+					MessageReferencePreviewControls: true,
+					NcEmojiPicker: NcEmojiPickerStub,
+				},
+			},
+		})
+
+		const editButton = wrapper.get('[arialabel="Edit message"]')
+		await editButton.trigger('click')
+		expect(wrapper.emitted('edit')?.[0]).toEqual([expect.objectContaining({ id: '$m' })])
+
+		const attachmentWrapper = shallowMount(MessageBubble, {
+			props: {
+				currentUserId: '@me:example.test',
+				message: {
+					id: '$m',
+					sender: '@me:example.test',
+					body: '',
+					timestamp: 1,
+					status: 'sent',
+					attachment: {
+						kind: 'image',
+						filename: 'photo.jpg',
+						mimeType: 'image/jpeg',
+						mxcUrl: 'mxc://matrix.example.test/photo',
+						size: 123,
+					},
+				},
+			},
+			global: {
+				stubs: {
+					MessageReferencePreview: MessageReferencePreviewStub,
+					MessageReferencePreviewControls: true,
+					NcEmojiPicker: NcEmojiPickerStub,
+				},
+			},
+		})
+		expect(attachmentWrapper.find('[arialabel="Edit message"]').exists()).toBe(false)
+	})
+
 	it('does not show a read check when the message is not read by the other user', () => {
 		const wrapper = shallowMount(MessageBubble, {
 			props: {

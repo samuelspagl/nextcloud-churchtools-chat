@@ -35,11 +35,13 @@ const emit = defineEmits<{
 	react: [message: ChatMessage, emoji: string]
 	unreact: [message: ChatMessage, emoji: string]
 	delete: [message: ChatMessage]
+	edit: [message: ChatMessage]
 	jump: []
 }>()
 
 const isDeleted = computed(() => props.message.redacted === true || props.message.body === '')
 const canDelete = computed(() => isOwn.value && props.message.status === 'sent' && !isDeleted.value)
+const canEdit = computed(() => isOwn.value && props.message.status === 'sent' && !isDeleted.value && !props.message.attachment)
 const isOwn = computed(() => props.message.sender === props.currentUserId)
 const senderLabel = computed(() => messageSenderLabel(props.message, props.currentUserId, t('churchtools_chat', 'You')))
 const hasReply = computed(() => isReplyMessage(props.message))
@@ -70,6 +72,7 @@ const replyIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V3l-
 const saveIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h12l4 4v14H5V3Zm2 2v14h12V8.1L16.9 6H7Zm2 0h6v5H9V5Zm1 8v4h4v-4h-4Z"/></svg>'
 const downloadIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3h2v10.2l3.6-3.6L18 11l-6 6-6-6 1.4-1.4 3.6 3.6V3ZM5 19h14v2H5v-2Z"/></svg>'
 const deleteIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v1H4v2h16V4h-5V3H9Zm-3 5 1 12h10l1-12H6Z"/></svg>'
+const editIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25ZM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z"/></svg>'
 const readIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7Zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l10.59-10.59L22.24 5.59ZM.41 13.41 6 19l1.41-1.41L1.83 12 .41 13.41Z"/></svg>'
 const reactIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-3.5-9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm7 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM12 17.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5Z"/></svg>'
 
@@ -173,6 +176,14 @@ async function saveToNextcloud() {
 									</template>
 								</NcButton>
 							</NcEmojiPicker>
+							<NcButton
+								v-if="canEdit"
+								variant="tertiary"
+								:aria-label="t('churchtools_chat', 'Edit message')"
+								:title="t('churchtools_chat', 'Edit message')"
+								@click="emit('edit', message)">
+								<template #icon><NcIconSvgWrapper :svg="editIcon" /></template>
+							</NcButton>
 							<NcButton
 								v-if="canDelete"
 								variant="tertiary"

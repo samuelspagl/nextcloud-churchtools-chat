@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 	setTyping: vi.fn(),
 	reactToMessage: vi.fn(),
 	deleteMessage: vi.fn(),
+	editMessage: vi.fn(),
 	getStatus: vi.fn(),
 	getRooms: vi.fn(),
 	syncRooms: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('../../src/services/chatApi', async (importActual) => {
 		setTyping: mocks.setTyping,
 		reactToMessage: mocks.reactToMessage,
 		deleteMessage: mocks.deleteMessage,
+		editMessage: mocks.editMessage,
 		getStatus: mocks.getStatus,
 		getRooms: mocks.getRooms,
 		syncRooms: mocks.syncRooms,
@@ -248,6 +250,56 @@ describe('useChat send/retry', () => {
 		const message = chat.rooms.value[0].events[0]
 		expect(message.reactions).toEqual({ '👍': 1 })
 		expect(message.ownReactions).toEqual([])
+	})
+
+	it('updates the message body and marks it edited after a successful edit', async () => {
+		mocks.editMessage.mockResolvedValue({ eventId: '$msg', transactionId: 'nc-x' })
+		mocks.getMessages.mockResolvedValue({
+			events: [{ id: '$msg', sender: '@me:test', body: 'hi', timestamp: 1 }],
+		})
+		const chat = useChat()
+		chat.rooms.value = [{
+			id: '!room:test',
+			name: 'r',
+			avatarUrl: null,
+			encrypted: false,
+			kind: 'group',
+			memberCount: 1,
+			unreadCount: 0,
+			lastMessage: null,
+			events: [],
+		}]
+		await chat.selectRoom('!room:test')
+
+		await chat.editMessage(chat.rooms.value[0].events[0], 'hi there')
+
+		expect(mocks.editMessage).toHaveBeenCalledWith('!room:test', '$msg', 'hi there', expect.any(String))
+		const message = chat.rooms.value[0].events[0]
+		expect(message.body).toBe('hi there')
+		expect(message.edited).toBe(true)
+	})
+
+	it('ignores edits with an empty body', async () => {
+		mocks.getMessages.mockResolvedValue({
+			events: [{ id: '$msg', sender: '@me:test', body: 'hi', timestamp: 1 }],
+		})
+		const chat = useChat()
+		chat.rooms.value = [{
+			id: '!room:test',
+			name: 'r',
+			avatarUrl: null,
+			encrypted: false,
+			kind: 'group',
+			memberCount: 1,
+			unreadCount: 0,
+			lastMessage: null,
+			events: [],
+		}]
+		await chat.selectRoom('!room:test')
+
+		await chat.editMessage(chat.rooms.value[0].events[0], '   ')
+
+		expect(mocks.editMessage).not.toHaveBeenCalled()
 	})
 
 	it('paginates older messages using the "end" token, not "start"', async () => {

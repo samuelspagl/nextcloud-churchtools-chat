@@ -10,6 +10,12 @@ vi.mock('@nextcloud/l10n', async (importOriginal) => ({
 	translate: (_app: string, text: string) => text,
 }))
 
+const mocks = vi.hoisted(() => ({ searchPersons: vi.fn() }))
+
+vi.mock('../../src/services/chatApi', () => ({
+	searchPersons: mocks.searchPersons,
+}))
+
 const showTribute = vi.fn()
 
 const NcRichContenteditableStub = defineComponent({
@@ -19,6 +25,8 @@ const NcRichContenteditableStub = defineComponent({
 		linkAutocomplete: { type: Boolean, default: false },
 		emojiAutocomplete: { type: Boolean, default: true },
 		placeholder: { type: String, default: '' },
+		autoComplete: { type: Function, default: () => [] },
+		userData: { type: Object, default: () => ({}) },
 	},
 	emits: ['update:modelValue', 'submit'],
 	setup(_props, { emit, expose }) {
@@ -67,9 +75,9 @@ const NcActionButtonStub = defineComponent({
 	template: '<button type="button" @click="$emit(\'click\')"><slot name="icon" /><slot /></button>',
 })
 
-function mountComposer(disabled = false) {
+function mountComposer(disabled = false, extraProps: Record<string, unknown> = {}) {
 	return mount(MessageComposer, {
-		props: { disabled },
+		props: { disabled, ...extraProps },
 		global: {
 			stubs: {
 				NcActionButton: NcActionButtonStub,
@@ -86,6 +94,38 @@ function mountComposer(disabled = false) {
 describe('MessageComposer', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
+	})
+
+	it('looks up people for the mention autocomplete and includes their matrix id when sending', async () => {
+		mocks.searchPersons.mockResolvedValue({
+			persons: [{ id: 123, guid: 'guid-1', matrixUserId: '@anna:test', displayName: 'Anna', imageUrl: null, info: '' }],
+		})
+		const wrapper = mountComposer()
+		const editor = wrapper.getComponent(NcRichContenteditableStub)
+
+		const autoComplete = editor.props('autoComplete') as (search: string, cb: (items: unknown[]) => void) => Promise<void>
+		const callback = vi.fn()
+		await autoComplete('ann', callback)
+
+		expect(mocks.searchPersons).toHaveBeenCalledWith('ann')
+		expect(callback).toHaveBeenCalledWith([{ id: '123', label: 'Anna', icon: 'icon-user', iconUrl: null, source: 'users' }])
+
+		await wrapper.get('textarea').setValue('Hi @123 how are you')
+		await wrapper.get('form').trigger('submit')
+
+		expect(wrapper.emitted('send')).toEqual([['Hi @123 how are you', ['@anna:test']]])
+	})
+
+	it('does not look up mentions for a short or empty query', async () => {
+		const wrapper = mountComposer()
+		const editor = wrapper.getComponent(NcRichContenteditableStub)
+		const autoComplete = editor.props('autoComplete') as (search: string, cb: (items: unknown[]) => void) => Promise<void>
+		const callback = vi.fn()
+
+		await autoComplete('a', callback)
+
+		expect(mocks.searchPersons).not.toHaveBeenCalled()
+		expect(callback).toHaveBeenCalledWith([])
 	})
 
 	it('opens the dynamic Smart Picker from the plus menu', async () => {
@@ -117,7 +157,7 @@ describe('MessageComposer', () => {
 		expect(sendButton.attributes('disabled')).toBeUndefined()
 		await wrapper.get('form').trigger('submit')
 
-		expect(wrapper.emitted('send')).toEqual([['Hello from Smart Picker']])
+		expect(wrapper.emitted('send')).toEqual([['Hello from Smart Picker', []]])
 		expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('')
 	})
 
@@ -149,5 +189,30 @@ describe('MessageComposer', () => {
 		await wrapper.findComponent(NcEmojiPickerStub).vm.$emit('select', '👍')
 
 		expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('👍')
+	})
+
+	it('prefills the draft from the message being edited and emits edit instead of send', async () => {
+		const editingMessage = { id: '$m', sender: '@me:test', body: 'Original text', timestamp: 1 }
+		const wrapper = mountComposer(false, { editingMessage })
+
+		expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('Original text')
+
+		await wrapper.get('textarea').setValue('Updated text')
+		await wrapper.get('form').trigger('submit')
+
+		expect(wrapper.emitted('edit')).toEqual([[editingMessage, 'Updated text']])
+		expect(wrapper.emitted('send')).toBeUndefined()
+	})
+
+	it('clears the draft and emits cancelEdit when editing is cancelled', async () => {
+		const editingMessage = { id: '$m', sender: '@me:test', body: 'Original text', timestamp: 1 }
+		const wrapper = mountComposer(false, { editingMessage })
+
+		const cancelButton = wrapper.findAll('button').find((button) => button.text() === 'Cancel')
+		expect(cancelButton).toBeDefined()
+		await cancelButton!.trigger('click')
+
+		expect(wrapper.emitted('cancelEdit')).toHaveLength(1)
+		expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('')
 	})
 })
