@@ -22,7 +22,7 @@ final class ProbeCommand extends Command {
 	}
 
 	protected function configure(): void {
-		$this->setDescription('Dump ChurchTools /api/chat and the joined Matrix rooms to verify the CT chat -> room mapping.')
+		$this->setDescription('Admin-only: dump ChurchTools /api/chat and joined Matrix rooms to verify their mapping.')
 			->addArgument('userId', InputArgument::REQUIRED, 'Nextcloud user id');
 	}
 

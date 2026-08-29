@@ -2,6 +2,31 @@
 
 All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
+## [0.6.4]
+
+### Fixed
+
+- Load Matrix rooms without requiring the administrator-only ChurchTools
+  `/api/chat` metadata endpoint.
+- Report forbidden ChurchTools resources separately from invalid access tokens.
+- Preserve valid UTF-8 in Matrix rich-reply bodies when removing the fallback
+  quote.
+- Show the initial room snapshot without waiting for the first incremental
+  Matrix long poll.
+- Keep the conversation list, message timeline, and composer inside independent
+  bounded scroll regions when chats or room lists are long.
+- Center the older-message control and keep conversation previews at normal
+  font weight while retaining emphasized conversation names.
+
+### Changed
+
+- Document the administrator permissions and inference limits that apply to
+  future ChurchTools group and event chat linking.
+- Build the initial room list from the Matrix sync snapshot, with only targeted
+  profile fallbacks instead of per-room member and message requests.
+- Build Docker and release packages from the same filtered, installable app
+  staging directory.
+
 ## [0.6.3]
 
 ### Fixed

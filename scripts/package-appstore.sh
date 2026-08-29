@@ -11,8 +11,7 @@ version="$(node -e "const fs=require('fs'); const xml=fs.readFileSync('appinfo/i
 staging_dir="$(mktemp -d)"
 trap 'rm -rf "$staging_dir"' EXIT
 
-mkdir -p "$staging_dir/churchtools_chat"
-rsync --archive --exclude-from=.nextcloudignore ./ "$staging_dir/churchtools_chat/"
+"$(dirname "$0")/stage-app.sh" "$staging_dir/churchtools_chat"
 tar --create --gzip --file "$output_path" --directory "$staging_dir" churchtools_chat
 
 tar --list --gzip --file "$output_path" > "$staging_dir/contents.txt"

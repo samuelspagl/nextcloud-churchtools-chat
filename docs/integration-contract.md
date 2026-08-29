@@ -1,6 +1,7 @@
 # ChurchTools and Matrix integration contract
 
-Verified against the tenant OpenAPI and public Matrix discovery on 2026-08-21.
+Verified against the tenant OpenAPI, generated authorization documentation, and
+public Matrix discovery through 2026-08-26.
 
 ## ChurchTools REST
 
@@ -13,12 +14,10 @@ Authentication uses the documented header form:
 Authorization: Login <token>
 ```
 
-Endpoints used by this app:
+Endpoints used by normal user-facing requests:
 
 - `GET /api/whoami?only_allow_authenticated=true` validates the token and
   returns the current person's ID, GUID, display information and chat flags.
-- `GET /api/chat` returns chat-domain metadata. The published schema contains
-  `guid`, `prefix`, `domainId`, `roomname`, `creator`, and `status`.
 - `GET /api/search?query=<query>&domain_types[]=person` searches visible
   ChurchTools people by name. Queries contain between 2 and 100 characters.
 - `GET /api/persons?ids[]=<personId>&limit=1` resolves a selected search result
@@ -34,10 +33,15 @@ The OpenAPI also documents creating, changing and deleting chat metadata, and
 starting/stopping group or event chats. This app does not invoke those mutating
 operations in its initial release.
 
-### Chat metadata (`GET /api/chat`)
+### Administrator-only chat metadata (`GET /api/chat`)
 
 Verified against the tenant OpenAPI (`/system/runtime/swagger/openapi.json`)
-on 2026-08-25. Each entry is:
+and generated authorization documentation (`/system/runtime/authdoc.html`) on
+2026-08-26. The operation is described as "Get all chats" and requires either
+the `administer persons` or `administer settings` permission. It is therefore
+not a personal chat-list endpoint and must not be called while loading rooms for
+ordinary users. The `churchtools_chat:probe` command retains it solely as an
+explicit administrator diagnostic. Each entry is:
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -94,9 +98,22 @@ Observed chat `prefix` values (determine the chat type, see D6):
 | `cta` | announcement chat (expected; to be confirmed with live data) |
 
 Other observations: a `creator` of `-4` marks chats created by the ChurchTools
-system. `/api/chat` lists chats the person is involved in even when they are not
-(yet) a member of the Matrix room; the room can be found by resolving the alias
-without joining.
+system. A room alias can be resolved without joining when its chat metadata is
+available to an authorized administrator.
+
+### Future group and event linking
+
+The canonical Matrix alias exposes the chat prefix and chat-specific GUID. The
+prefix can classify known chat types (`ctg` for groups and `cte` for events), but
+the alias does not contain the numeric ChurchTools `domainId`. Matrix room IDs
+are opaque, and room names are not unique, so neither may be used to infer a
+ChurchTools group or event ID.
+
+Any future feature that links a room to a ChurchTools group or event must use a
+documented endpoint available under the connected user's own permissions and
+must handle invisible entities explicitly. It must not reintroduce `/api/chat`
+as a normal runtime dependency. The endpoint may only remain optional
+administrator enrichment or diagnosis.
 
 The published OpenAPI does **not** expose message events or a Matrix
 token-exchange/bootstrap endpoint. Those capabilities must not be invented from
@@ -126,6 +143,19 @@ The gateway uses standard Matrix endpoints only:
 - `PUT /_matrix/client/v3/user/{userId}/account_data/m.direct`
 - `PUT /_matrix/client/v3/rooms/{roomId}/send/m.room.message/{transactionId}`
 - `PUT /_matrix/client/v3/rooms/{roomId}/send/m.reaction/{transactionId}`
+
+The initial room list is a snapshot built from one `/sync` response. Room-local
+member events from its state and timeline are used first; a global `/profile`
+lookup is only used when a direct-chat target or a necessary unnamed-room hero
+lacks display metadata. The snapshot does not issue a `/members` request or a
+`/messages?limit=1` backfill for every room. Its timeline window is the source
+for `lastMessage`; rooms without a displayable event initially return
+`lastMessage: null` and load their history when opened.
+
+After applying that snapshot, the client starts incremental `/sync` requests in
+the background using `next_batch`. A request with no new events may remain open
+for the configured 20 seconds: this is intentional Matrix long polling and must
+not delay rendering the initial room list or ending its loading state.
 
 End-to-end encrypted rooms are detected through `m.room.encryption` and are
 shown as unsupported. The server does not attempt to decrypt or return encrypted

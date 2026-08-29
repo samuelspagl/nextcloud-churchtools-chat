@@ -74,7 +74,19 @@ final class ProbeServiceTest extends TestCase {
 		$probe->collect('admin');
 	}
 
-	private function createProbe(): ProbeService {
+	public function testCollectSurfacesAdminOnlyChatPermissionFailure(): void {
+		$probe = $this->createProbe(403);
+
+		try {
+			$probe->collect('admin');
+			self::fail('Expected an IntegrationException.');
+		} catch (IntegrationException $exception) {
+			self::assertSame('churchtools_forbidden', $exception->getErrorCode());
+			self::assertSame(403, $exception->getHttpStatus());
+		}
+	}
+
+	private function createProbe(int $chatStatus = 200): ProbeService {
 		$config = $this->createMock(IConfig::class);
 		$config->method('getAppValue')->willReturnCallback(
 			static fn (string $appId, string $key, string $default = ''): string => match ($key) {
@@ -98,7 +110,7 @@ final class ProbeServiceTest extends TestCase {
 		});
 
 		$chatResponse = $this->createMock(IResponse::class);
-		$chatResponse->method('getStatusCode')->willReturn(200);
+		$chatResponse->method('getStatusCode')->willReturn($chatStatus);
 		$chatResponse->method('getBody')->willReturn(json_encode([
 			'data' => [[
 				'creator' => 1,

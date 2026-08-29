@@ -133,10 +133,12 @@ onBeforeUnmount(() => {
 
 <template>
 	<section ref="timeline" class="timeline" aria-label="Messages" aria-live="polite" aria-relevant="additions" @scroll="updateStickToBottom">
-		<button v-if="hasMore" type="button" class="timeline__load-older" :disabled="loading" @click="emit('loadOlder')">
-			<NcLoadingIcon v-if="loading" :size="16" />
-			<span>{{ t('churchtools_chat', 'Load older messages') }}</span>
-		</button>
+		<div v-if="hasMore" class="timeline__load-older-row">
+			<button type="button" class="timeline__load-older" :disabled="loading" @click="emit('loadOlder')">
+				<NcLoadingIcon v-if="loading" :size="16" />
+				<span>{{ t('churchtools_chat', 'Load older messages') }}</span>
+			</button>
+		</div>
 		<div ref="content" class="timeline__content">
 			<div v-if="loading" class="timeline__state">
 				<NcLoadingIcon :size="32" />
@@ -174,7 +176,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.timeline { width: 100%; min-height: 0; overflow-y: auto; }
+.timeline { width: 100%; min-height: 0; flex: 1 1 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
 .timeline__content { display: flex; width: 100%; min-height: 100%; flex-direction: column; gap: 14px; padding: 24px clamp(16px, 4vw, 56px); }
 .timeline__state { margin: auto; color: var(--color-text-maxcontrast); }
 .timeline__day {
@@ -196,7 +198,8 @@ onBeforeUnmount(() => {
 	white-space: nowrap;
 	text-transform: capitalize;
 }
-.timeline__load-older { align-self: center; margin: 8px auto 0; padding: 6px 12px; border: none; border-radius: var(--border-radius-pill, 9999px); background: var(--color-background-dark); color: var(--color-text-maxcontrast); cursor: pointer; }
+.timeline__load-older-row { display: flex; width: 100%; flex: 0 0 auto; justify-content: center; padding-block-start: 8px; }
+.timeline__load-older-row > .timeline__load-older { width: fit-content; margin: 0; padding: 6px 12px; border: none; border-radius: var(--border-radius-pill, 9999px); background: var(--color-background-dark); color: var(--color-text-maxcontrast); font-weight: normal; cursor: pointer; }
 .timeline__load-older:disabled { opacity: 0.6; cursor: default; }
 .timeline__typing {
 	display: flex;

@@ -1,5 +1,6 @@
 .env
 !.env.example
+.build/
 .DS_Store
 node_modules/
 .pnpm-store/
