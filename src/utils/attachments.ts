@@ -1,5 +1,7 @@
 import { generateUrl } from '@nextcloud/router'
 
+export const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024
+
 export function attachmentThumbnailUrl(mxcUrl: string): string {
 	// Keep failed responses from the former media endpoint out of the browser cache.
 	return `${generateUrl('/apps/churchtools_chat/api/media/thumbnail')}?mxc=${encodeURIComponent(mxcUrl)}&v=2`

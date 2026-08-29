@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { showWarning } from '@nextcloud/dialogs'
+import { showError, showWarning } from '@nextcloud/dialogs'
 import NcContent from '@nextcloud/vue/components/NcContent'
 import { translate as t } from '@nextcloud/l10n'
 import { generateUrl } from '@nextcloud/router'
 import { computed, shallowRef } from 'vue'
+import AttachmentDropzone from './components/AttachmentDropzone.vue'
 import ConversationSidebar from './components/ConversationSidebar.vue'
 import ConversationDetailsSidebar from './components/ConversationDetailsSidebar.vue'
 import ConversationHeader from './components/ConversationHeader.vue'
 import MessageComposer from './components/MessageComposer.vue'
 import MessageTimeline from './components/MessageTimeline.vue'
 import PersonSearch from './components/PersonSearch.vue'
+import { getErrorMessage } from './services/chatApi'
 import { useChat } from './composables/useChat'
+import { MAX_ATTACHMENT_BYTES } from './utils/attachments'
 import type { ChatMessage, PersonSearchResult } from './types/chat'
 
 const {
@@ -48,6 +51,7 @@ const {
 	focusMessage,
 	startDirectChat,
 	send,
+	sendFile,
 	setTyping,
 	retry,
 	react,
@@ -64,6 +68,7 @@ const messageSearchQuery = shallowRef('')
 const personSearchOpen = shallowRef(false)
 const sidebarOpen = shallowRef(true)
 const replyTarget = shallowRef<ChatMessage | null>(null)
+const pendingFiles = shallowRef<File[]>([])
 const settingsUrl = generateUrl('/settings/user/additional')
 const connectionNotice = computed(() => {
 	if (!status.value) return ''
@@ -143,6 +148,39 @@ async function sendMessage(body: string) {
 	}
 }
 
+const attachmentsDisabled = computed(() => !activeRoom.value || !status.value?.capabilities.send || activeRoom.value.encrypted)
+
+function addPendingFiles(files: FileList) {
+	const accepted: File[] = []
+	for (const file of Array.from(files)) {
+		if (file.size > MAX_ATTACHMENT_BYTES) {
+			showError(t('churchtools_chat', '{filename} is too large to send.', { filename: file.name }))
+			continue
+		}
+		accepted.push(file)
+	}
+	if (accepted.length > 0) pendingFiles.value = [...pendingFiles.value, ...accepted]
+}
+
+function removePendingFile(file: File) {
+	pendingFiles.value = pendingFiles.value.filter((pending) => pending !== file)
+}
+
+async function sendPendingFiles(files: File[]) {
+	pendingFiles.value = []
+	for (const file of files) {
+		try {
+			await sendFile(file)
+		} catch (caught) {
+			if (caught instanceof Error && caught.message === 'attachment_too_large') {
+				showError(t('churchtools_chat', '{filename} is too large to send.', { filename: file.name }))
+			} else {
+				showError(getErrorMessage(caught))
+			}
+		}
+	}
+}
+
 async function reactToMessage(message: ChatMessage, emoji: string) {
 	try {
 		await react(message, emoji)
@@ -210,44 +248,50 @@ async function retryMessage(message: ChatMessage) {
 						@toggle-details="toggleDetails" />
 				</div>
 				<div class="chat-pane__body">
-					<div v-if="connectionNotice || error" class="connection-state" role="status">
-						<h2>{{ t('churchtools_chat', 'ChurchTools Chat is not ready') }}</h2>
-						<p>{{ connectionNotice || error }}</p>
-						<a :href="settingsUrl">{{ t('churchtools_chat', 'Open Personal settings') }}</a>
-					</div>
-					<div v-else-if="activeRoom?.encrypted" class="connection-state" role="status">
-						<h2>{{ t('churchtools_chat', 'This room is encrypted') }}</h2>
-						<p>{{ t('churchtools_chat', 'End-to-end encrypted Matrix events cannot be processed by the server-side gateway. Encrypted event content is not decrypted or displayed.') }}</p>
-					</div>
-					<MessageTimeline
-						v-else-if="activeRoom"
-						:messages="messages"
-						:current-user-id="status?.matrixUserId || ''"
-						:loading="loadingMessages"
-						:has-more="activeRoom?.hasMore ?? false"
-						:focus-message-id="focusedMessageId"
-						:reply-targets="replyTargets"
-						:typing-users="activeRoom?.typingUsers ?? []"
-						:read-receipts="activeRoom?.kind === 'direct' ? activeRoom?.readReceipts : undefined"
-						@load-older="loadOlderMessages(activeRoomId ?? '')"
-						@retry="retryMessage"
-						@reply="replyTarget = $event"
-						@react="reactToMessage"
-						@unreact="unreactToMessage"
-						@delete="deleteMessage"
-						@jump="focusMessage" />
-					<div v-else-if="!loading" class="connection-state">
-						<h2>{{ t('churchtools_chat', 'Select a conversation') }}</h2>
-						<p>{{ t('churchtools_chat', 'Choose a ChurchTools room from the conversation list.') }}</p>
-					</div>
+					<AttachmentDropzone :disabled="attachmentsDisabled" @files-dropped="addPendingFiles">
+						<div v-if="connectionNotice || error" class="connection-state" role="status">
+							<h2>{{ t('churchtools_chat', 'ChurchTools Chat is not ready') }}</h2>
+							<p>{{ connectionNotice || error }}</p>
+							<a :href="settingsUrl">{{ t('churchtools_chat', 'Open Personal settings') }}</a>
+						</div>
+						<div v-else-if="activeRoom?.encrypted" class="connection-state" role="status">
+							<h2>{{ t('churchtools_chat', 'This room is encrypted') }}</h2>
+							<p>{{ t('churchtools_chat', 'End-to-end encrypted Matrix events cannot be processed by the server-side gateway. Encrypted event content is not decrypted or displayed.') }}</p>
+						</div>
+						<MessageTimeline
+							v-else-if="activeRoom"
+							:messages="messages"
+							:current-user-id="status?.matrixUserId || ''"
+							:loading="loadingMessages"
+							:has-more="activeRoom?.hasMore ?? false"
+							:focus-message-id="focusedMessageId"
+							:reply-targets="replyTargets"
+							:typing-users="activeRoom?.typingUsers ?? []"
+							:read-receipts="activeRoom?.kind === 'direct' ? activeRoom?.readReceipts : undefined"
+							@load-older="loadOlderMessages(activeRoomId ?? '')"
+							@retry="retryMessage"
+							@reply="replyTarget = $event"
+							@react="reactToMessage"
+							@unreact="unreactToMessage"
+							@delete="deleteMessage"
+							@jump="focusMessage" />
+						<div v-else-if="!loading" class="connection-state">
+							<h2>{{ t('churchtools_chat', 'Select a conversation') }}</h2>
+							<p>{{ t('churchtools_chat', 'Choose a ChurchTools room from the conversation list.') }}</p>
+						</div>
+					</AttachmentDropzone>
 				</div>
 				<MessageComposer
 					v-if="activeRoom && !(connectionNotice || error)"
 					:disabled="!status?.capabilities.send || activeRoom.encrypted"
 					:reply-to="replyTarget"
+					:pending-files="pendingFiles"
 					@typing="setTyping"
 					@cancel-reply="replyTarget = null"
-					@send="sendMessage" />
+					@send="sendMessage"
+					@send-files="sendPendingFiles"
+					@files-selected="addPendingFiles"
+					@remove-pending-file="removePendingFile" />
 			</main>
 		</div>
 		<ConversationDetailsSidebar

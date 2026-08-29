@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OCA\ChurchToolsChat\Controller;
 
+use OCA\ChurchToolsChat\Exception\IntegrationException;
 use OCA\ChurchToolsChat\Service\ChatGateway;
 use OCA\ChurchToolsChat\Service\UserContext;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -71,6 +72,27 @@ final class ChatController extends ApiController {
 	#[NoAdminRequired]
 	public function send(string $roomId, string $body, ?string $transactionId = null, ?string $replyTo = null): JSONResponse {
 		return $this->respond(fn (): array => $this->gateway->send($this->userContext->getUserId(), $roomId, $body, $transactionId, $replyTo), 201);
+	}
+
+	#[NoAdminRequired]
+	public function sendAttachment(string $roomId, ?string $transactionId = null): JSONResponse {
+		$file = $this->request->getUploadedFile('file');
+		return $this->respond(function () use ($roomId, $transactionId, $file): array {
+			$error = is_array($file) ? ($file['error'] ?? UPLOAD_ERR_NO_FILE) : UPLOAD_ERR_NO_FILE;
+			if ($error === UPLOAD_ERR_INI_SIZE || $error === UPLOAD_ERR_FORM_SIZE) {
+				throw new IntegrationException('matrix_media_too_large', 'The attachment is too large.', 413);
+			}
+			if (!is_array($file) || $error !== UPLOAD_ERR_OK) {
+				throw new IntegrationException('invalid_attachment', 'No file was uploaded.', 400);
+			}
+			$contents = file_get_contents((string)$file['tmp_name']);
+			if ($contents === false) {
+				throw new IntegrationException('invalid_attachment', 'The uploaded file could not be read.', 400);
+			}
+			$contentType = (string)($file['type'] ?? 'application/octet-stream');
+			$filename = (string)($file['name'] ?? 'attachment');
+			return $this->gateway->sendAttachment($this->userContext->getUserId(), $roomId, $contents, $contentType, $filename, $transactionId);
+		}, 201);
 	}
 
 	#[NoAdminRequired]

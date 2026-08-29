@@ -3,5 +3,5 @@ SPDX-FileCopyrightText: churchtools-chat-nextcloud developers
 
 This file is generated from multiple sources. Included packages:
 - churchtools-chat-nextcloud
-	- version: 0.6.4
+	- version: 0.6.5
 	- license: AGPL-3.0-or-later

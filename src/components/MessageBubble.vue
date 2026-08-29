@@ -46,6 +46,7 @@ const hasReply = computed(() => isReplyMessage(props.message))
 const replyFallbackText = computed(() =>
 	hasReply.value ? getReplyFallbackQuote(props.message) : null)
 const savingAttachment = shallowRef(false)
+const isAttachmentReady = computed(() => (props.message.attachment?.mxcUrl ?? '').startsWith('mxc://'))
 
 function isOwnReaction(emoji: string): boolean {
 	return props.message.ownReactions?.some((reaction) => reaction.key === emoji) ?? false
@@ -147,7 +148,7 @@ async function saveToNextcloud() {
 								</template>
 							</NcButton>
 							<NcButton
-								v-if="message.attachment"
+								v-if="message.attachment && isAttachmentReady"
 								variant="tertiary"
 								:disabled="savingAttachment"
 								:aria-label="t('churchtools_chat', 'Save to Nextcloud')"
@@ -156,7 +157,7 @@ async function saveToNextcloud() {
 								<template #icon><NcIconSvgWrapper :svg="saveIcon" /></template>
 							</NcButton>
 							<NcButton
-								v-if="message.attachment"
+								v-if="message.attachment && isAttachmentReady"
 								variant="tertiary"
 								:aria-label="t('churchtools_chat', 'Download attachment')"
 								:title="t('churchtools_chat', 'Download attachment')"
@@ -199,7 +200,7 @@ async function saveToNextcloud() {
 					<div v-if="message.status" class="message__status" role="status">
 						<span v-if="message.status === 'sending'">{{ t('churchtools_chat', 'Sending…') }}</span>
 						<span v-else-if="message.status === 'failed'">{{ t('churchtools_chat', 'Not sent') }}</span>
-						<NcButton v-if="message.status === 'failed'" variant="tertiary" @click="emit('retry', message)">
+						<NcButton v-if="message.status === 'failed' && !message.attachment" variant="tertiary" @click="emit('retry', message)">
 							{{ t('churchtools_chat', 'Retry') }}
 						</NcButton>
 						<NcIconSvgWrapper

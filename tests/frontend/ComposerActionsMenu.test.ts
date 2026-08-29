@@ -48,8 +48,37 @@ describe('ComposerActionsMenu', () => {
 		await wrapper.get('button[aria-label="Add content"]').trigger('click')
 		expect(wrapper.text()).toContain('Smart Picker')
 
-		await wrapper.get('div > div button').trigger('click')
+		const actionButtons = wrapper.findAll('div > div button')
+		const smartPickerButton = actionButtons.find((button) => button.text().includes('Smart Picker'))
+		await smartPickerButton?.trigger('click')
 		expect(wrapper.emitted('openSmartPicker')).toHaveLength(1)
+	})
+
+	it('opens the file picker and emits selected files', async () => {
+		const wrapper = mount(ComposerActionsMenu, {
+			props: { disabled: false },
+			global: {
+				stubs: {
+					NcActions: NcActionsStub,
+					NcActionButton: NcActionButtonStub,
+					NcIconSvgWrapper: true,
+				},
+			},
+		})
+
+		await wrapper.get('button[aria-label="Add content"]').trigger('click')
+		const actionButtons = wrapper.findAll('div > div button')
+		const attachButton = actionButtons.find((button) => button.text().includes('Attach file'))
+		expect(attachButton).toBeDefined()
+
+		const input = wrapper.get('input[type="file"]')
+		const file = new File(['content'], 'photo.png', { type: 'image/png' })
+		Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+		await input.trigger('change')
+
+		const emitted = wrapper.emitted('filesSelected')
+		expect(emitted).toHaveLength(1)
+		expect((emitted?.[0]?.[0] as FileList)[0]).toBe(file)
 	})
 
 	it('disables the plus menu together with the composer', () => {

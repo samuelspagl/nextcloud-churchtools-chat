@@ -107,6 +107,7 @@ function createChatState() {
 }
 
 const NcContentStub = defineComponent({ template: '<div><slot /></div>' })
+const AttachmentDropzoneStub = defineComponent({ template: '<div><slot /></div>' })
 const ConversationHeaderStub = defineComponent({ template: '<header aria-label="Conversation header" />' })
 const MessageTimelineStub = defineComponent({ template: '<section aria-label="Messages" />' })
 const MessageComposerStub = defineComponent({
@@ -119,6 +120,7 @@ function mountApp() {
 		global: {
 			stubs: {
 				NcContent: NcContentStub,
+				AttachmentDropzone: AttachmentDropzoneStub,
 				ConversationHeader: ConversationHeaderStub,
 				MessageTimeline: MessageTimelineStub,
 				MessageComposer: MessageComposerStub,

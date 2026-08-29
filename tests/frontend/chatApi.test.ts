@@ -13,7 +13,7 @@ vi.mock('@nextcloud/router', () => ({
 	generateUrl: (path: string) => path,
 }))
 
-import { getErrorCode, getErrorMessage, getErrorValue, getRoomDetails, searchConversations, searchPersons, searchRoomMessages, startDirectChat } from '../../src/services/chatApi'
+import { getErrorCode, getErrorMessage, getErrorValue, getRoomDetails, searchConversations, searchPersons, searchRoomMessages, sendAttachment, startDirectChat } from '../../src/services/chatApi'
 
 const mockedAxios = vi.mocked(axios)
 
@@ -84,6 +84,35 @@ describe('direct chat API', () => {
 			'/apps/churchtools_chat/api/search',
 			{ params: { query: 'meeting notes' } },
 		)
+	})
+})
+
+describe('attachment API', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+	})
+
+	it('uploads the file as multipart form data to the scoped endpoint', async () => {
+		mockedAxios.post.mockResolvedValue({
+			data: {
+				data: {
+					eventId: '$event',
+					transactionId: 'txn-1',
+					attachment: { kind: 'file', mxcUrl: 'mxc://server/media', filename: 'notes.pdf', mimeType: 'application/pdf', size: 1234 },
+				},
+			},
+		})
+		const file = new File(['content'], 'notes.pdf', { type: 'application/pdf' })
+
+		await sendAttachment('!room:chat.church.tools', file, 'txn-1')
+
+		expect(mockedAxios.post).toHaveBeenCalledWith(
+			'/apps/churchtools_chat/api/rooms/!room%3Achat.church.tools/attachments',
+			expect.any(FormData),
+		)
+		const form = mockedAxios.post.mock.calls[0][1] as FormData
+		expect(form.get('file')).toBe(file)
+		expect(form.get('transactionId')).toBe('txn-1')
 	})
 })
 

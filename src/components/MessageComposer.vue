@@ -7,13 +7,21 @@ import { translate as t } from '@nextcloud/l10n'
 import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue'
 import type { ChatMessage } from '../types/chat'
 import ComposerActionsMenu from './ComposerActionsMenu.vue'
+import PendingAttachments from './PendingAttachments.vue'
 
-const props = defineProps<{ disabled: boolean; replyTo?: ChatMessage | null }>()
-const emit = defineEmits<{ send: [body: string]; cancelReply: []; typing: [typing: boolean] }>()
+const props = withDefaults(defineProps<{ disabled: boolean; replyTo?: ChatMessage | null; pendingFiles?: File[] }>(), { pendingFiles: () => [] })
+const emit = defineEmits<{
+	send: [body: string]
+	sendFiles: [files: File[]]
+	cancelReply: []
+	typing: [typing: boolean]
+	filesSelected: [files: FileList]
+	removePendingFile: [file: File]
+}>()
 
 const draft = shallowRef('')
 const editor = useTemplateRef<InstanceType<typeof NcRichContenteditable>>('editor')
-const canSend = computed(() => !props.disabled && draft.value.trim() !== '')
+const canSend = computed(() => !props.disabled && (draft.value.trim() !== '' || props.pendingFiles.length > 0))
 const sendIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 21 23 12 2 3v7l15 2-15 2v7Z"/></svg>'
 const smileyIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-3.5-9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm7 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM12 17.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5Z"/></svg>'
 
@@ -56,7 +64,8 @@ function submit() {
 	const body = draft.value.trim()
 	if (!canSend.value) return
 	clearTyping()
-	emit('send', body)
+	if (props.pendingFiles.length > 0) emit('sendFiles', [...props.pendingFiles])
+	if (body !== '') emit('send', body)
 	draft.value = ''
 }
 
@@ -118,12 +127,13 @@ function insertEmoji(emoji: string) {
 <template>
 	<form class="composer" @submit.prevent="submit">
 		<div class="composer__inner">
+			<PendingAttachments v-if="pendingFiles.length" :files="pendingFiles" @remove="emit('removePendingFile', $event)" />
 			<div v-if="replyTo" class="composer__reply">
 				<span>{{ t('churchtools_chat', 'Replying to') }} {{ replyTo.senderName || replyTo.sender }}: {{ replyTo.body }}</span>
 				<NcButton type="button" variant="tertiary" @click="emit('cancelReply')">{{ t('churchtools_chat', 'Cancel') }}</NcButton>
 			</div>
 			<div class="composer__controls">
-				<ComposerActionsMenu :disabled="disabled" @open-smart-picker="openSmartPicker" />
+				<ComposerActionsMenu :disabled="disabled" @open-smart-picker="openSmartPicker" @files-selected="emit('filesSelected', $event)" />
 				<NcEmojiPicker :close-on-select="true" @select="insertEmoji">
 					<NcButton
 						variant="tertiary"
