@@ -54,7 +54,7 @@ const accessDetails = computed(() => [
 	{ label: t('churchtools_chat', 'History visibility'), value: resolved.value.historyVisibility },
 ].filter((detail): detail is { label: string; value: string } => detail.value !== null && detail.value !== ''))
 
-const hasTechnicalDetails = computed(() => resolved.value.creator !== null || resolved.value.roomId !== '')
+const hasTechnicalDetails = computed(() => resolved.value.creator !== null || resolved.value.roomId !== '' || accessDetails.value.length > 0)
 const hasSearchTerm = computed(() => props.searchQuery.trim().length >= 2)
 
 function updateSearchQuery(query: string | number) {
@@ -99,7 +99,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
 				</div>
 				<div class="details-hero__identity">
 					<h2>{{ resolved.name }}</h2>
-					<span>{{ roomType }}</span>
 				</div>
 				<p v-if="resolved.topic" class="details-hero__topic">{{ resolved.topic }}</p>
 			</div>
@@ -147,13 +146,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
 					</dl>
 				</section>
 
-				<section v-if="accessDetails.length > 0" class="details-section" :aria-label="t('churchtools_chat', 'Room access')">
-					<h3>{{ t('churchtools_chat', 'Room access') }}</h3>
-					<dl class="details-rows">
-						<div v-for="detail in accessDetails" :key="detail.label"><dt>{{ detail.label }}</dt><dd>{{ detail.value }}</dd></div>
-					</dl>
-				</section>
-
 				<section class="details-section" :aria-label="t('churchtools_chat', 'Participants')">
 					<div class="details-section__heading"><h3>{{ t('churchtools_chat', 'Participants') }}</h3><span>{{ resolved.memberCount }}</span></div>
 					<p v-if="resolved.members.length === 0" class="details-empty">{{ t('churchtools_chat', 'No participant information is available.') }}</p>
@@ -179,6 +171,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
 					<dl class="details-rows">
 						<div v-if="resolved.creator"><dt>{{ t('churchtools_chat', 'Creator') }}</dt><dd>{{ resolved.creator }}</dd></div>
 						<div><dt>{{ t('churchtools_chat', 'Room ID') }}</dt><dd>{{ resolved.roomId }}</dd></div>
+						<div v-for="detail in accessDetails" :key="detail.label"><dt>{{ detail.label }}</dt><dd>{{ detail.value }}</dd></div>
 					</dl>
 				</details>
 			</template>
@@ -191,7 +184,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
 .details-hero__avatar { display: grid; padding: 2px; border: 1px solid var(--color-primary-element-light); border-radius: 50%; }
 .details-hero__identity { display: grid; gap: 2px; }
 .details-hero__identity h2 { margin: 0; font-size: 18px; }
-.details-hero__identity span, .details-hero__topic { color: var(--color-text-maxcontrast); font-size: 13px; }
+.details-hero__topic { color: var(--color-text-maxcontrast); font-size: 13px; }
 .details-hero__topic { max-inline-size: 100%; margin: 2px 0 0; white-space: pre-wrap; }
 .details-search { padding: 0 12px 10px; }
 .details-search__hint { margin: 5px 0 0; color: var(--color-text-maxcontrast); font-size: 12px; }
@@ -212,10 +205,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
 .technical-details summary { color: var(--color-text-maxcontrast); cursor: pointer; font-size: 13px; }
 .technical-details[open] summary { margin-block-end: 5px; }
 .search-result-list { margin: 6px 0 0; padding: 0; list-style: none; }
-.search-result { display: grid; width: 100%; gap: 3px; padding: 7px 0; border: 0; border-top: 1px solid var(--color-border); color: inherit; background: transparent; cursor: pointer; text-align: start; }
+.search-result { display: grid; width: 100%; gap: 3px; padding: 7px 0; border: 0; border-top: 1px solid var(--color-border); color: inherit; background: transparent; font-weight: normal; cursor: pointer; text-align: start; }
 .search-result-list li:first-child .search-result { border-top: 0; }
 .search-result:hover, .search-result:focus-visible { color: var(--color-primary-element); background: var(--color-background-hover); outline: none; }
 .search-result__meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
 .search-result__meta time { color: var(--color-text-maxcontrast); white-space: nowrap; }
-.search-result__excerpt { overflow: hidden; color: var(--color-text-maxcontrast); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.search-result__excerpt { overflow: hidden; color: var(--color-text-maxcontrast); font-size: 13px; font-weight: normal; text-overflow: ellipsis; white-space: nowrap; }
 </style>
