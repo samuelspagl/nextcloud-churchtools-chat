@@ -69,9 +69,10 @@ final class ChatController extends ApiController {
 		return $this->respond(fn (): array => $this->gateway->getRoomDetails($this->userContext->getUserId(), $roomId));
 	}
 
+	/** @param list<string>|null $mentions */
 	#[NoAdminRequired]
-	public function send(string $roomId, string $body, ?string $transactionId = null, ?string $replyTo = null): JSONResponse {
-		return $this->respond(fn (): array => $this->gateway->send($this->userContext->getUserId(), $roomId, $body, $transactionId, $replyTo), 201);
+	public function send(string $roomId, string $body, ?string $transactionId = null, ?string $replyTo = null, ?array $mentions = null): JSONResponse {
+		return $this->respond(fn (): array => $this->gateway->send($this->userContext->getUserId(), $roomId, $body, $transactionId, $replyTo, $mentions), 201);
 	}
 
 	#[NoAdminRequired]

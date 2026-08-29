@@ -2,6 +2,15 @@
 
 All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
+## [0.6.7]
+
+### Added
+
+- Mentions autocomplete (B10): typing `@` in the composer lists the active
+  members of the current chat, narrowing as you type, and sends a real
+  Matrix intentional mention (`m.mentions`), so mentioned users are notified
+  and highlighted for them.
+
 ## [0.6.4]
 
 ### Fixed

@@ -5,13 +5,22 @@ import NcIconSvgWrapper from '@nextcloud/vue/components/NcIconSvgWrapper'
 import NcRichContenteditable from '@nextcloud/vue/components/NcRichContenteditable'
 import { translate as t } from '@nextcloud/l10n'
 import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue'
-import type { ChatMessage } from '../types/chat'
+import type { ChatMessage, RoomDetails } from '../types/chat'
+import { displayableAvatarUrl } from '../utils/avatar'
 import ComposerActionsMenu from './ComposerActionsMenu.vue'
 import PendingAttachments from './PendingAttachments.vue'
 
-const props = withDefaults(defineProps<{ disabled: boolean; replyTo?: ChatMessage | null; pendingFiles?: File[] }>(), { pendingFiles: () => [] })
+interface MentionSuggestion {
+	id: string
+	label: string
+	icon: string
+	iconUrl: string | null
+	source: 'users'
+}
+
+const props = withDefaults(defineProps<{ disabled: boolean; replyTo?: ChatMessage | null; pendingFiles?: File[]; roomDetails?: RoomDetails | null }>(), { pendingFiles: () => [], roomDetails: null })
 const emit = defineEmits<{
-	send: [body: string]
+	send: [body: string, mentions: string[]]
 	sendFiles: [files: File[]]
 	cancelReply: []
 	typing: [typing: boolean]
@@ -60,12 +69,46 @@ onBeforeUnmount(() => {
 	emit('typing', false)
 })
 
+const roomMemberSuggestions = computed<MentionSuggestion[]>(() => (props.roomDetails?.members ?? [])
+	.filter((member) => member.membership === 'join')
+	.map((member) => ({
+		id: member.id.slice(1),
+		label: member.displayName,
+		icon: 'icon-user',
+		iconUrl: displayableAvatarUrl(member.avatarUrl) ?? null,
+		source: 'users' as const,
+	})))
+
+const mentionUserData = computed<Record<string, MentionSuggestion>>(() => Object.fromEntries(
+	roomMemberSuggestions.value.map((item) => [item.id, item]),
+))
+
+function autoCompleteMention(search: string, callback: (items: MentionSuggestion[]) => void) {
+	if (props.disabled) {
+		callback([])
+		return
+	}
+	const query = search.trim().toLowerCase()
+	const items = query === ''
+		? roomMemberSuggestions.value
+		: roomMemberSuggestions.value.filter((item) => item.label.toLowerCase().includes(query))
+	callback(items)
+}
+
+function extractMentionedMatrixIds(body: string): string[] {
+	const ids = new Set<string>()
+	for (const member of roomMemberSuggestions.value) {
+		if (body.includes(`@${member.id}`)) ids.add(`@${member.id}`)
+	}
+	return [...ids]
+}
+
 function submit() {
 	const body = draft.value.trim()
 	if (!canSend.value) return
 	clearTyping()
 	if (props.pendingFiles.length > 0) emit('sendFiles', [...props.pendingFiles])
-	if (body !== '') emit('send', body)
+	if (body !== '') emit('send', body, extractMentionedMatrixIds(body))
 	draft.value = ''
 }
 
@@ -155,6 +198,8 @@ function insertEmoji(emoji: string) {
 					:placeholder="t('churchtools_chat', 'Write a message…')"
 					:link-autocomplete="true"
 					:emoji-autocomplete="false"
+					:auto-complete="autoCompleteMention"
+					:user-data="mentionUserData"
 					@submit="submit" />
 				<NcButton
 					class="composer__send"
