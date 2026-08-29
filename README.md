@@ -10,7 +10,9 @@ It can search visible ChurchTools people by name and start or reopen a Matrix
 direct conversation for the selected person.
 For group conversations, the chat inspector can resolve a uniquely named,
 visible ChurchTools group and show its group details together with matching
-Nextcloud Teams, linked folders, and Deck boards.
+Nextcloud Teams, linked folders, and Deck boards. Chats also support
+reactions, `@` mentions with autocomplete, typing indicators, and read
+receipts.
 
 ## Current integration boundary
 

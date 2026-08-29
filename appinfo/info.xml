@@ -4,8 +4,29 @@
     <id>churchtools_chat</id>
     <name>ChurchTools Chat</name>
     <summary>ChurchTools chat inside Nextcloud (experimental)</summary>
-    <description><![CDATA[A chat-only Nextcloud app for ChurchTools Chat with person search, direct conversations, a native Vue interface, Markdown rendering and Smart Picker support. This app is experimental: it may change, be incomplete, or behave unexpectedly, and should be used with care.]]></description>
-    <version>0.7.0</version>
+    <description><![CDATA[**⚠️ Experimental:** This app is still experimental. It may change, be incomplete, or behave unexpectedly. Use it with care and do not rely on it for critical workflows.
+
+ChurchTools Chat brings [ChurchTools](https://church.tools) chat into Nextcloud with a native, Talk-like interface built on Vue 3. Search for people, start direct conversations, and read group context without leaving Nextcloud.
+
+### ✨ Features
+
+* 🔍 **Person search & direct conversations** — find visible ChurchTools people by name and start or reopen a Matrix direct conversation with them
+* 💬 **Native Vue 3 interface** — a Talk-like chat experience built with maintained `@nextcloud/vue` components
+* 📝 **Markdown rendering** — messages render Markdown, including inline replies shown as block quotes
+* 📎 **Nextcloud Smart Picker support** — insert files, links and other Nextcloud content directly into messages
+* 👥 **Group context inspector** — resolves a uniquely named ChurchTools group and shows its details together with matching Nextcloud Teams, linked folders and Deck boards
+* 😀 **Reactions & mentions** — react to messages with emoji and mention people with autocomplete
+* ⌨️ **Typing indicators & read receipts** — see when others are typing and whether direct messages have been read
+* 🔐 **Per-user ChurchTools credentials** — every user connects their own ChurchTools account; no shared or admin-level credentials are required
+
+### 🚀 Setup
+
+1. Install and enable the app as `churchtools_chat`.
+2. As an administrator, open **Administration settings → Additional settings** and configure the ChurchTools tenant URL and the Matrix homeserver URL.
+3. Each user then opens **Personal settings → Additional settings** and connects their own ChurchTools account.
+
+📖 See the [README](https://github.com/samuelspagl/nextcloud-churchtools-chat#readme) for full setup and security details.]]></description>
+    <version>0.7.1</version>
     <licence>AGPL-3.0-or-later</licence>
     <author>Samuel Spagl</author>
     <namespace>ChurchToolsChat</namespace>

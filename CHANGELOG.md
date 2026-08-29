@@ -2,6 +2,13 @@
 
 All notable changes to ChurchTools Chat for Nextcloud are documented here.
 
+## [0.7.1]
+
+### Changed
+
+- Rewrote the Nextcloud App Store description with a formatted feature list
+  and setup instructions.
+
 ## [0.7.0]
 
 ### Added
