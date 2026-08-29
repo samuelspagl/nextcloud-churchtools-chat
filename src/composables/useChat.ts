@@ -111,9 +111,7 @@ export function useChat() {
 		clearMessageSearch()
 		roomDetails.value = null
 		roomDetailsError.value = ''
-		if (detailsOpen.value) {
-			void loadRoomDetails(roomId)
-		}
+		void loadRoomDetails(roomId)
 		const selectedRoom = rooms.value.find((room) => room.id === roomId)
 		if (selectedRoom?.encrypted) {
 			rooms.value = rooms.value.map((room) => room.id === roomId ? { ...room, events: [] } : room)
@@ -162,7 +160,7 @@ export function useChat() {
 		}
 	}
 
-	async function send(body: string, options?: { replyTo?: ChatMessage; transactionId?: string }) {
+	async function send(body: string, options?: { replyTo?: ChatMessage; transactionId?: string; mentions?: string[] }) {
 		const roomId = activeRoomId.value
 		const replyTo = options?.replyTo
 		if (!roomId || body.trim() === '') return
@@ -181,7 +179,7 @@ export function useChat() {
 			? { ...room, events: [...room.events, optimistic], lastMessage: optimistic }
 			: room)
 		try {
-			const sent = await sendMessage(roomId, optimistic.body, txn, replyTo?.id)
+			const sent = await sendMessage(roomId, optimistic.body, txn, replyTo?.id, options?.mentions)
 			rooms.value = rooms.value.map((room) => room.id === roomId
 				? { ...room, events: room.events.map((message) => message.id === txn ? { ...message, id: sent.eventId, status: 'sent' } : message) }
 				: room)

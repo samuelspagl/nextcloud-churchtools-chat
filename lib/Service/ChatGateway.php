@@ -227,8 +227,11 @@ final class ChatGateway {
 		return ['results' => $results];
 	}
 
-	/** @return array{eventId:string,transactionId:string} */
-	public function send(string $userId, string $roomId, string $body, ?string $transactionId, ?string $replyTo = null): array {
+	/**
+	 * @param list<string>|null $mentions
+	 * @return array{eventId:string,transactionId:string}
+	 */
+	public function send(string $userId, string $roomId, string $body, ?string $transactionId, ?string $replyTo = null, ?array $mentions = null): array {
 		$this->assertRoomId($roomId);
 		if ($replyTo !== null) {
 			$this->assertEventId($replyTo);
@@ -237,14 +240,32 @@ final class ChatGateway {
 		if ($body === '' || mb_strlen($body) > 10000) {
 			throw new IntegrationException('invalid_message', 'Messages must contain between 1 and 10,000 characters.');
 		}
+		$mentions = $this->assertMentions($mentions);
 		$transactionId = $transactionId !== null && preg_match('/^[A-Za-z0-9._-]{8,128}$/', $transactionId)
 			? $transactionId
 			: bin2hex(random_bytes(16));
-		$result = $this->matrix->sendMessage($this->requireMatrixToken($userId), $roomId, $body, $transactionId, $replyTo);
+		$result = $this->matrix->sendMessage($this->requireMatrixToken($userId), $roomId, $body, $transactionId, $replyTo, $mentions);
 		return [
 			'eventId' => (string)($result['event_id'] ?? ''),
 			'transactionId' => $transactionId,
 		];
+	}
+
+	/**
+	 * @param list<string>|null $mentions
+	 * @return list<string>|null
+	 */
+	private function assertMentions(?array $mentions): ?array {
+		if ($mentions === null || $mentions === []) {
+			return null;
+		}
+		$unique = array_values(array_unique($mentions));
+		foreach ($unique as $userId) {
+			if (!is_string($userId) || !preg_match('/^@[A-Za-z0-9._=\/+-]+:[A-Za-z0-9.-]+$/', $userId)) {
+				throw new IntegrationException('invalid_mention', 'A mentioned user identifier is invalid.');
+			}
+		}
+		return $unique;
 	}
 
 	/** @return array{eventId:string,transactionId:string,attachment:array{kind:string,mxcUrl:string,filename:string,mimeType:string|null,size:int|null}} */

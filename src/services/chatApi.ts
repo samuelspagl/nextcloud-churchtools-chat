@@ -79,10 +79,10 @@ export async function getRoomDetails(roomId: string): Promise<RoomDetails> {
 	return response.data.data
 }
 
-export async function sendMessage(roomId: string, body: string, transactionId: string, replyTo?: string): Promise<{ eventId: string; transactionId: string }> {
+export async function sendMessage(roomId: string, body: string, transactionId: string, replyTo?: string, mentions?: string[]): Promise<{ eventId: string; transactionId: string }> {
 	const response = await axios.post<ApiEnvelope<{ eventId: string; transactionId: string }>>(
 		endpoint(`/api/rooms/${encodeURIComponent(roomId)}/messages`),
-		{ body, transactionId, replyTo },
+		{ body, transactionId, replyTo, mentions },
 	)
 	return response.data.data
 }

@@ -426,11 +426,17 @@ final class MatrixClient {
 		);
 	}
 
-	/** @return array<string,mixed> */
-	public function sendMessage(string $accessToken, string $roomId, string $body, string $transactionId, ?string $replyTo = null): array {
+	/**
+	 * @param list<string>|null $mentions
+	 * @return array<string,mixed>
+	 */
+	public function sendMessage(string $accessToken, string $roomId, string $body, string $transactionId, ?string $replyTo = null, ?array $mentions = null): array {
 		$content = ['msgtype' => 'm.text', 'body' => $body];
 		if ($replyTo !== null) {
 			$content['m.relates_to'] = ['m.in_reply_to' => ['event_id' => $replyTo]];
+		}
+		if ($mentions !== null && $mentions !== []) {
+			$content['m.mentions'] = ['user_ids' => $mentions];
 		}
 		return $this->request(
 			'PUT',
