@@ -26,7 +26,7 @@ ChurchTools Chat brings [ChurchTools](https://church.tools) chat into Nextcloud 
 3. Each user then opens **Personal settings → Additional settings** and connects their own ChurchTools account.
 
 📖 See the [README](https://github.com/samuelspagl/nextcloud-churchtools-chat#readme) for full setup and security details.]]></description>
-    <version>0.7.4</version>
+    <version>0.7.5</version>
     <licence>AGPL-3.0-or-later</licence>
     <author>Samuel Spagl</author>
     <namespace>ChurchToolsChat</namespace>
