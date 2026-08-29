@@ -1,4 +1,20 @@
+<div align="center">
+
+<img src="img/app.svg" alt="ChurchTools Chat" width="96" height="96">
+
 # ChurchTools Chat for Nextcloud
+
+**A native, Talk-like ChurchTools chat experience inside Nextcloud.**
+
+[![Main verification](https://github.com/samuelspagl/nextcloud-churchtools-chat/actions/workflows/main-verification.yml/badge.svg)](https://github.com/samuelspagl/nextcloud-churchtools-chat/actions/workflows/main-verification.yml)
+[![PR checks](https://github.com/samuelspagl/nextcloud-churchtools-chat/actions/workflows/pr-checks.yml/badge.svg)](https://github.com/samuelspagl/nextcloud-churchtools-chat/actions/workflows/pr-checks.yml)
+[![Release](https://img.shields.io/github/v/release/samuelspagl/nextcloud-churchtools-chat?label=release)](https://github.com/samuelspagl/nextcloud-churchtools-chat/releases)
+[![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Nextcloud](https://img.shields.io/badge/Nextcloud-33%20%E2%80%93%2034-0082C9?logo=nextcloud&logoColor=white)](https://nextcloud.com)
+[![PHP](https://img.shields.io/badge/PHP-%E2%89%A5%208.1-777BB4?logo=php&logoColor=white)](https://www.php.net)
+[![Vue 3](https://img.shields.io/badge/Vue-3-4FC08D?logo=vue.js&logoColor=white)](https://vuejs.org)
+
+</div>
 
 > **⚠️ Experimental:** This app is still experimental. It may change, be
 > incomplete, or behave unexpectedly. Use it with care and do not rely on it
@@ -14,7 +30,28 @@ Nextcloud Teams, linked folders, and Deck boards. Chats also support
 reactions, `@` mentions with autocomplete, typing indicators, and read
 receipts.
 
-## Current integration boundary
+### ✨ Features
+
+- 🔍 **Person search & direct conversations** — find visible ChurchTools people by name and start or reopen a Matrix direct conversation with them
+- 💬 **Native Vue 3 interface** — a Talk-like chat experience built with maintained `@nextcloud/vue` components
+- 📝 **Markdown rendering** — messages render Markdown, including inline replies shown as block quotes
+- 📎 **Smart Picker support** — insert files, links, and other Nextcloud content directly into messages
+- 👥 **Group context inspector** — resolves a uniquely named ChurchTools group and shows its details together with matching Nextcloud Teams, linked folders, and Deck boards
+- 😀 **Reactions & mentions** — react to messages with emoji and mention people with autocomplete
+- ⌨️ **Typing indicators & read receipts** — see when others are typing and whether direct messages have been read
+- 🔐 **Per-user credentials** — every user connects their own ChurchTools account; no shared or admin-level credentials are required
+
+## Table of contents
+
+- [Current integration boundary](#current-integration-boundary)
+- [Starting a direct chat](#starting-a-direct-chat)
+- [Development](#development)
+- [Releases](#releases)
+- [Nextcloud App Store](#nextcloud-app-store)
+- [Local Docker test stack](#local-docker-test-stack)
+- [Security](#security)
+
+## 🧭 Current integration boundary
 
 The published ChurchTools OpenAPI exposes administrator-only chat metadata at
 `/api/chat`, but no message transport or Matrix token-exchange endpoint. Reading
@@ -40,7 +77,7 @@ match, and uses the connected user's permissions for all group and member
 details. Matching Nextcloud Teams and resources are likewise limited to the
 current Nextcloud user's access.
 
-## Starting a direct chat
+## 💬 Starting a direct chat
 
 The **New chat** action searches ChurchTools with
 `GET /api/search?query=<name>&domain_types[]=person`. After selection, the
@@ -48,7 +85,7 @@ backend resolves the person again by ChurchTools person ID, derives the Matrix
 ID from the returned GUID, reuses an existing `m.direct` room when possible,
 or creates a private room and invites the selected person.
 
-## Development
+## 🛠️ Development
 
 ```sh
 pnpm install
@@ -62,7 +99,7 @@ enable it, configure the ChurchTools tenant and Matrix homeserver under
 **Administration settings → Additional settings**, and have each user connect
 their own account in **Personal settings → Additional settings**.
 
-## Releases
+## 🚀 Releases
 
 `appinfo/info.xml` is the release-version source of truth; `package.json` must
 contain the same `major.minor.patch` version. Pull requests to `main` run the
@@ -76,7 +113,7 @@ status checks before merging. Allow GitHub Actions to create and approve pull
 requests only if that matches the repository's governance policy; no additional
 release secret is required for the built-in `GITHUB_TOKEN`.
 
-## Nextcloud App Store
+## 🏪 Nextcloud App Store
 
 After the Nextcloud certificate request for `churchtools_chat` is approved and
 the app is registered in the App Store, create the protected GitHub environment
@@ -87,7 +124,7 @@ environment secrets, then set the repository variable `APPSTORE_ENABLED` to
 environment approval. Use **Publish to Nextcloud App Store** with a tag to
 publish an existing release manually.
 
-## Local Docker test stack
+## 🐳 Local Docker test stack
 
 The included Compose stack runs Nextcloud 34 with PostgreSQL and Redis, mounts
 the release-like `.build/churchtools_chat` staging directory as the local app,
@@ -153,7 +190,7 @@ credentials, use `docker compose down --volumes` deliberately.
 The verified remote boundary is recorded in
 [`docs/integration-contract.md`](docs/integration-contract.md).
 
-## Security
+## 🔐 Security
 
 - Only hosted `https://*.church.tools` tenant URLs are accepted (configured by the administrator).
 - The Matrix homeserver URL is configured by the administrator and defaults to `https://chat.church.tools`.
